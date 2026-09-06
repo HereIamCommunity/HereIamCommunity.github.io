@@ -222,7 +222,7 @@ export type HostContext = {
   at?: Date;
 };
 
-function kstStamp(d: Date) {
+export function kstStamp(d: Date) {
   const md = d.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" })
     .replace(/\s/g, "").replace(/\.$/, "").replace(".", "/");
   const hm = d.toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false });
@@ -241,7 +241,7 @@ function hostDetailLines(b: Booking): string[] {
 /** 누가 · 언제 · 무엇을 · 어떤 액션 — 한 문장 */
 function hostActionLine(event: BookingEvent, b: Booking, when: string): string {
   const label = typeLabel(b);
-  if (event === "received") return `${b.name}님이 ${when}에 ${label}을 예약 신청했어요.`;
+  if (event === "received") return `${b.name}님이 ${when}에 ${label} 예약을 신청했어요.`;
   if (event === "confirmed") {
     return b.via === "toss"
       ? `${b.name}님이 ${when}에 ${label} 요금을 카드로 결제했어요. 예약이 자동 확정됐어요.`
@@ -310,7 +310,7 @@ export function isSendable(m: BuiltMessage): boolean {
  * 이번 이벤트에서 실제로 보낼 메시지를 고른다 (순수 함수).
  *
  * - 게스트: 알림톡 템플릿이 없으면 보내지 않는다 (검수 전 차단).
- * - 호스트: 게스트가 발송 대상일 때만 함께 보낸다. 템플릿이 없어도 문자로 보낸다.
+ * - 호스트: 템플릿과 무관하게 항상 보낸다 (문자, HOST 템플릿 있으면 알림톡). 템플릿이 없어도 문자로 보낸다.
  * - hostOnly(어드민 알림 테스트): 게스트는 건너뛰고 호스트만 보낸다.
  */
 export function planMessages(
@@ -352,7 +352,7 @@ function failureOf(to: string, failed: readonly FailedEntry[]): SendResult {
 }
 
 /**
- * 게스트 + 호스트 메시지를 한 번의 send() 로 발송한다.
+ * 게스트 → 호스트 순서로 두 번 발송한다 (게스트 결과를 호스트 문자에 싣기 위해).
  * 알림톡 옵션이 없으면 text만 보내 순수 문자로 나간다.
  */
 export async function sendBookingMessages(

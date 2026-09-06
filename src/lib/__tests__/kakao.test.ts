@@ -4,6 +4,7 @@ import {
   buildGuestMessage,
   buildHostMessage,
   isSendable,
+  kstStamp,
   planMessages,
   fill,
   type Booking,
@@ -322,5 +323,49 @@ describe("isSendable — 알림톡 옵션 유무", () => {
         kakaoOptions: { pfId: "p", templateId: "t", variables: {}, disableSms: false },
       })
     ).toBe(true);
+  });
+});
+
+describe("호스트 문자 — 누가·언제·무엇을·어떤 액션", () => {
+  const at = new Date("2026-09-07T00:12:00+09:00");
+
+  it("kstStamp는 서버 TZ와 무관하게 KST 'M/D HH:MM'", () => {
+    expect(kstStamp(at)).toBe("9/7 00:12");
+    expect(kstStamp(new Date("2026-12-25T18:30:00+09:00"))).toBe("12/25 18:30");
+    expect(kstStamp(new Date("2026-01-01T00:30:00+09:00"))).toBe("1/1 00:30");
+  });
+
+  it("첫 줄 문장 — 살롱/스테이 × 접수·입금확인·카드결제·취소", () => {
+    const line = (ev: "received" | "confirmed" | "cancelled", b: Booking) =>
+      buildHostMessage(ev, b, { at }).text.split("\n")[1];
+    expect(line("received", { ...salon, via: "web" })).toBe("김코이님이 9/7 00:12에 살롱 예약을 신청했어요.");
+    expect(line("received", { ...stay, via: "web" })).toBe("이노니님이 9/7 00:12에 스테이 예약을 신청했어요.");
+    expect(line("confirmed", { ...salon, via: "admin" })).toBe("김코이님의 살롱 예약을 9/7 00:12에 입금확인 처리했어요.");
+    expect(line("confirmed", { ...stay, via: "toss" })).toBe(
+      "이노니님이 9/7 00:12에 스테이 요금을 카드로 결제했어요. 예약이 자동 확정됐어요."
+    );
+    expect(line("cancelled", { ...stay, via: "admin" })).toBe("이노니님의 스테이 예약을 9/7 00:12에 취소 처리했어요.");
+  });
+
+  it("헤더 — 카드결제는 '카드결제 완료', 그 외 이벤트 라벨", () => {
+    expect(buildHostMessage("confirmed", { ...stay, via: "toss" }, { at }).text.split("\n")[0]).toBe("[코이노니아] 카드결제 완료 · 스테이");
+    expect(buildHostMessage("confirmed", { ...salon, via: "admin" }, { at }).text.split("\n")[0]).toBe("[코이노니아] 입금확인 완료 · 살롱");
+  });
+
+  it("게스트 결과 안내 4분기", () => {
+    const t = (r?: "ok" | "skipped" | { error: string }) => buildHostMessage("received", salon, { at, guestResult: r }).text;
+    expect(t("ok")).toContain("게스트에게 안내 알림톡을 보냈어요.");
+    expect(t("skipped")).toContain("게스트 알림은 아직 발송되지 않았어요 (템플릿 미설정).");
+    expect(t({ error: "1042 유효한 템플릿 아이디가 아닙니다." })).toContain(
+      "게스트 알림 발송 실패 (1042 유효한 템플릿 아이디가 아닙니다). 어드민에서 재발송해 주세요."
+    );
+    expect(t(undefined)).not.toContain("게스트");
+  });
+
+  it("다음 할 일 — 접수는 입금확인 안내, 취소는 환불 안내, 확정은 없음", () => {
+    expect(buildHostMessage("received", salon, { at }).text).toContain("'입금확인'을 눌러주세요");
+    expect(buildHostMessage("cancelled", salon, { at }).text).toContain("환불 처리가 필요해요");
+    expect(buildHostMessage("confirmed", salon, { at }).text).not.toContain("눌러주세요");
+    expect(buildHostMessage("received", salon, { at }).text).toContain("koinonia-web.vercel.app/admin");
   });
 });
