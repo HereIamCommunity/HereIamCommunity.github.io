@@ -46,11 +46,11 @@ export default function Footer() {
                   스토어 · Store
                 </Link>
               </li>
-              {/* <li>
+              <li>
                 <Link href="/andong" className="hover:text-[#ff6b35] transition-colors">
                   안동 가이드 · Andong
                 </Link>
-              </li> */}
+              </li>
             </ul>
           </div>
 

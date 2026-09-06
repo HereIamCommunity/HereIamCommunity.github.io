@@ -13,7 +13,7 @@ const menuItems: MenuItem[] = [
   { href: "/salon",   kr: "살롱",       en: "Salon"   },
   { href: "/retreat", kr: "썸머캠프",   en: "Camp"    },
   { href: "/store",   kr: "스토어",     en: "Store"   },
-  // { href: "/andong",  kr: "안동 가이드", en: "Andong"  }, // 임시 비공개
+  { href: "/andong",  kr: "안동 가이드", en: "Andong"  },
 ];
 
 export default function Nav() {
