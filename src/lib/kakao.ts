@@ -351,6 +351,15 @@ export async function sendBookingMessages(
       groupId: res.groupInfo?.groupId,
     };
   } catch (e) {
+    // 전량 접수 실패 시 SDK가 MessageNotReceivedError 를 throw 한다.
+    // 건별 사유는 e.failedMessageList 에 있으므로 그걸 우선 쓴다.
+    const failed = (e as { failedMessageList?: readonly FailedEntry[] })?.failedMessageList;
+    if (Array.isArray(failed) && failed.length > 0) {
+      return {
+        guest: guestPending ? failureOf(guestTo, failed) : "skipped",
+        host: hostPending ? failureOf(hostTo, failed) : "skipped",
+      };
+    }
     const error = e instanceof Error ? e.message : String(e);
     return {
       guest: guestPending ? { error } : "skipped",
