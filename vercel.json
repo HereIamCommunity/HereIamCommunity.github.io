@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/morning-digest",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron/stay-reminder",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/cron/stay-checkout",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

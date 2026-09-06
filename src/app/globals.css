@@ -1,0 +1,37 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --color-orange: #ff6b35;
+  --color-orange-light: #ff8f5e;
+  --color-orange-dark: #e55a25;
+  --color-teal: #296973;
+  --color-teal-light: #3a8a96;
+  --color-teal-dark: #1d4e56;
+  --color-brown: #372a14;
+  --color-cream: #fffbde;
+  --color-pink: #f2d9d0;
+  --color-sky: #d0eef2;
+
+  --font-sans: "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+}
+
+:root {
+  --background: #fffbde;
+  --foreground: #372a14;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: white;
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+html {
+  scroll-behavior: smooth;
+}
