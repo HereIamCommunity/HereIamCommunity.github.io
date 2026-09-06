@@ -284,7 +284,8 @@ function failureOf(to: string, failed: readonly FailedEntry[]): SendResult {
  */
 export async function sendBookingMessages(
   event: BookingEvent,
-  booking: Booking
+  booking: Booking,
+  opts: { hostOnly?: boolean } = {}
 ): Promise<SendBookingResult> {
   if (!hasSolapi()) {
     console.warn("[NOTIFY] 솔라피 환경변수 미설정 — 발송 건너뜀");
@@ -292,8 +293,11 @@ export async function sendBookingMessages(
   }
 
   const from = stripPhone(process.env.SOLAPI_SENDER_PHONE!);
-  const guestTo = stripPhone(booking.phone);
-  const hostTo = stripPhone(process.env.OPERATOR_PHONE ?? "");
+  const guestTo = opts.hostOnly ? "" : stripPhone(booking.phone);
+  let hostTo = stripPhone(process.env.OPERATOR_PHONE ?? "");
+  // 게스트와 호스트가 같은 번호면 솔라피가 중복 수신번호(1026)로 한 통을 실패 처리하므로
+  // 호스트 사본은 건너뛴다. (호스트가 직접 예약한 경우)
+  if (guestTo && hostTo === guestTo) hostTo = "";
 
   const messages: {
     to: string;

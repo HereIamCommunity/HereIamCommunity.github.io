@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 샘플: 호스트 번호로만 발송 (게스트 번호 = 호스트 번호)
+  // 샘플: 호스트 메시지 한 통만 호스트 번호로 발송
   const sample: Booking = {
     type: "salon",
     createdAt: new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }),
@@ -57,10 +57,10 @@ export async function POST(req: NextRequest) {
     totalAmount: 0,
   };
 
-  const result = await sendBookingMessages("received", sample);
+  const result = await sendBookingMessages("received", sample, { hostOnly: true });
 
   return NextResponse.json({
-    ok: result.guest === "ok" || result.host === "ok",
+    ok: result.host === "ok",
     missingKakao,
     kakaoMode: missingKakao.length === 0 ? "알림톡(문자 대체)" : "문자만 (템플릿 env 미설정)",
     sentTo: process.env.OPERATOR_PHONE,
