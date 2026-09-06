@@ -28,6 +28,15 @@ const PROGRAMS: Program[] = [
     price: 10000,
   },
   {
+    id: "p0909",
+    type: "potluck",
+    date: "2026-09-09",
+    dateLabel: "9월 9일 (수) 19:00",
+    title: "수요포틀럭 🍽️",
+    subtitle: "",
+    price: 10000,
+  },
+  {
     id: "p0916",
     type: "potluck",
     date: "2026-09-16",
