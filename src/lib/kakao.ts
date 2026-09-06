@@ -19,7 +19,7 @@ import { SolapiMessageService } from "solapi";
 
 /* ─── 문안 상수 ─────────────────────────────────── */
 const BANK_ACCOUNT = "하나은행 5539-10-13844507 (코이노니아)";
-const CONTACT_PHONE = "010-2608-9144";
+const CONTACT_PHONE = "010-2608-9144"; // 알림톡 템플릿에 적힌 연락처
 const STAY_CHECKIN_TIME = "15:00";
 const STAY_CHECKOUT_TIME = "11:00";
 
@@ -152,11 +152,12 @@ function stayReceived(b: Booking): BuiltMessage {
   return { text, kakaoOptions: kakaoOptions(process.env.KAKAO_TEMPLATE_STAY_RECEIVED, variables) };
 }
 
+// 솔라피 등록 템플릿 eQ47xS1xvH — 변수명은 템플릿에 등록된 한글 그대로
 function salonConfirmed(b: Booking): BuiltMessage {
   const variables = {
-    "#{name}": b.name,
-    "#{program}": b.program ?? "",
-    "#{date}": b.date ?? "",
+    "#{이름}": b.name,
+    "#{프로그램명}": b.program ?? "",
+    "#{일시}": b.date ?? "",
   };
   const text = [
     `${b.name}님, 코이노니아 살롱 참가가 확정되었습니다.`,
@@ -166,9 +167,12 @@ function salonConfirmed(b: Booking): BuiltMessage {
     `일시: ${b.date ?? ""}`,
     `장소: 코이노니아 (경북 안동시)`,
     ``,
-    `당일 일정 변경이 필요하시면 ${CONTACT_PHONE} 으로 미리 연락 부탁드립니다.`,
+    `당일 일정 변경이 필요하시면`,
+    `${CONTACT_PHONE} 으로`,
+    `미리 연락 부탁드립니다.`,
     ``,
-    `함께해 주셔서 진심으로 감사해요. 코이노니아에서 즐거운 시간 되시길 바랍니다 🎉`,
+    `함께해 주셔서 진심으로 감사해요.`,
+    `코이노니아에서 즐거운 시간 되시길 바랍니다 🎉`,
   ].join("\n");
   return { text, kakaoOptions: kakaoOptions(process.env.KAKAO_TEMPLATE_SALON_CONFIRMED, variables) };
 }

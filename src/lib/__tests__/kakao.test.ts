@@ -105,16 +105,17 @@ describe("buildGuestMessage — 스테이 접수", () => {
 });
 
 describe("buildGuestMessage — 확정", () => {
-  it("살롱 확정은 SALON_CONFIRMED 템플릿과 name/program/date 변수를 쓴다", () => {
+  it("살롱 확정은 SALON_CONFIRMED 템플릿과 한글 변수(이름/프로그램명/일시)를 쓴다", () => {
     process.env.KAKAO_PFID = "PF123";
     process.env.KAKAO_TEMPLATE_SALON_CONFIRMED = "TPL_SALON_CONF";
     const msg = buildGuestMessage("confirmed", salon);
     expect(msg.text).toContain("확정");
+    expect(msg.text).toContain("010-2608-9144");
     expect(msg.kakaoOptions?.templateId).toBe("TPL_SALON_CONF");
     expect(msg.kakaoOptions?.variables).toEqual({
-      "#{name}": "김코이",
-      "#{program}": "목요살롱 · 필사",
-      "#{date}": "2026-09-10 19:00",
+      "#{이름}": "김코이",
+      "#{프로그램명}": "목요살롱 · 필사",
+      "#{일시}": "2026-09-10 19:00",
     });
   });
 
@@ -200,7 +201,7 @@ describe("변수 키 형식", () => {
         for (const msg of [buildGuestMessage(ev, booking), buildHostMessage(ev, booking)]) {
           const keys = Object.keys(msg.kakaoOptions?.variables ?? {});
           expect(keys.length).toBeGreaterThan(0);
-          for (const k of keys) expect(k).toMatch(/^#\{[a-zA-Z]+\}$/);
+          for (const k of keys) expect(k).toMatch(/^#\{[a-zA-Z가-힣]+\}$/);
         }
       }
     }
