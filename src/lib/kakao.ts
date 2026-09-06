@@ -257,6 +257,11 @@ export function buildHostMessage(event: BookingEvent, booking: Booking): BuiltMe
   return { text, kakaoOptions: kakaoOptions(process.env.KAKAO_TEMPLATE_HOST, variables) };
 }
 
+/** 알림톡 템플릿이 갖춰진 메시지만 발송 대상이다 (순수 함수). */
+export function isSendable(m: BuiltMessage): boolean {
+  return !!m.kakaoOptions;
+}
+
 /* ─── 발송 ──────────────────────────────────────── */
 function hasSolapi() {
   return !!(
@@ -306,16 +311,27 @@ export async function sendBookingMessages(
     kakaoOptions?: KakaoOptions;
   }[] = [];
 
+  // 템플릿(=kakaoOptions)이 없는 메시지는 보내지 않는다.
+  // 템플릿 검수 전에는 어떤 알림도 나가지 않게 하려는 의도. 문자는 알림톡 실패 시 대체로만 쓴다.
+  let guestPending = false;
+  let hostPending = false;
   if (guestTo) {
     const m = buildGuestMessage(event, booking);
-    messages.push({ to: guestTo, from, text: m.text, kakaoOptions: m.kakaoOptions });
+    if (isSendable(m)) {
+      messages.push({ to: guestTo, from, text: m.text, kakaoOptions: m.kakaoOptions });
+      guestPending = true;
+    }
   }
   if (hostTo) {
     const m = buildHostMessage(event, booking);
-    messages.push({ to: hostTo, from, text: m.text, kakaoOptions: m.kakaoOptions });
+    if (isSendable(m)) {
+      messages.push({ to: hostTo, from, text: m.text, kakaoOptions: m.kakaoOptions });
+      hostPending = true;
+    }
   }
 
   if (messages.length === 0) {
+    console.warn(`[NOTIFY] 템플릿 미설정 — ${event} 발송 건너뜀`);
     return { guest: "skipped", host: "skipped" };
   }
 
@@ -327,15 +343,15 @@ export async function sendBookingMessages(
     const res = await client.send(messages);
     const failed: readonly FailedEntry[] = res.failedMessageList ?? [];
     return {
-      guest: guestTo ? failureOf(guestTo, failed) : "skipped",
-      host: hostTo ? failureOf(hostTo, failed) : "skipped",
+      guest: guestPending ? failureOf(guestTo, failed) : "skipped",
+      host: hostPending ? failureOf(hostTo, failed) : "skipped",
       groupId: res.groupInfo?.groupId,
     };
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
     return {
-      guest: guestTo ? { error } : "skipped",
-      host: hostTo ? { error } : "skipped",
+      guest: guestPending ? { error } : "skipped",
+      host: hostPending ? { error } : "skipped",
     };
   }
 }

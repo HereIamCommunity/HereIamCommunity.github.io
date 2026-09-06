@@ -62,7 +62,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: result.host === "ok",
     missingKakao,
-    kakaoMode: missingKakao.length === 0 ? "알림톡(문자 대체)" : "문자만 (템플릿 env 미설정)",
+    kakaoMode: missingKakao.length === 0
+      ? "알림톡 (실패 시 문자 대체)"
+      : "발송 안 함 — 템플릿 env 설정 전까지 모든 알림이 건너뜀",
     sentTo: process.env.OPERATOR_PHONE,
     result,
     preview: {

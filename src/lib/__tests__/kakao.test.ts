@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { buildGuestMessage, buildHostMessage, type Booking } from "@/lib/kakao";
+import { buildGuestMessage, buildHostMessage, isSendable, type Booking } from "@/lib/kakao";
 
 const ENV_KEYS = [
   "KAKAO_PFID",
@@ -204,5 +204,16 @@ describe("변수 키 형식", () => {
         }
       }
     }
+  });
+});
+
+describe("isSendable — 템플릿 없으면 발송 안 함", () => {
+  it("kakaoOptions 없으면 false", () => {
+    expect(isSendable({ text: "x" })).toBe(false);
+  });
+  it("kakaoOptions 있으면 true", () => {
+    expect(
+      isSendable({ text: "x", kakaoOptions: { pfId: "p", templateId: "t", variables: {}, disableSms: false } })
+    ).toBe(true);
   });
 });
