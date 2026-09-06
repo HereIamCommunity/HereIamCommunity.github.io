@@ -88,14 +88,6 @@ export default function OpenStayPage() {
         </div>
       </section>
 
-      {/* ── 영상 ── */}
-      {/* VIMEO_PLACEHOLDER: 아래 div를 Vimeo embed iframe으로 교체하세요 */}
-      <section className="bg-black flex items-center justify-center" style={{ minHeight: "360px" }}>
-        <div className="text-white/30 text-sm text-center py-20">
-          [ 영업정지 홍보 영상 — Vimeo 링크 받으면 여기에 삽입 ]
-        </div>
-      </section>
-
       {/* ── 우리가 바라는 것 ── */}
       <section className="py-20 md:py-28 px-6 md:px-16 bg-white">
         <div className="max-w-3xl mx-auto">

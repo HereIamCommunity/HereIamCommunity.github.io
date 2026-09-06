@@ -35,3 +35,12 @@ body {
 html {
   scroll-behavior: smooth;
 }
+
+/* 전역 포커스 링
+   Tailwind v4의 `outline-none` 유틸은 @layer utilities 안에서 생성되고,
+   레이어 없는(unlayered) 선언이 레이어 선언보다 캐스케이드 우선순위가 높다.
+   그래서 이 규칙은 특이도가 낮아도(:where = 0) 기존 focus:outline-none 37곳을 이긴다. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #e55a25;
+  outline-offset: 2px;
+}

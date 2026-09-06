@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -11,7 +11,7 @@ const menuItems: MenuItem[] = [
   { href: "/about",   kr: "코이노니아", en: "Story"   },
   { href: "/stay",    kr: "스테이",     en: "Stay"    },
   { href: "/salon",   kr: "살롱",       en: "Salon"   },
-  { href: "/retreat", kr: "썸머캠프",   en: "Camp",   badge: "NEW" },
+  { href: "/retreat", kr: "썸머캠프",   en: "Camp"    },
   { href: "/store",   kr: "스토어",     en: "Store"   },
   // { href: "/andong",  kr: "안동 가이드", en: "Andong"  }, // 임시 비공개
 ];
@@ -21,6 +21,7 @@ export default function Nav() {
   const [scrolled, setScrolled] = useState(false);
   const pathname              = usePathname();
   const isHome                = pathname === "/";
+  const menuButtonRef         = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -32,6 +33,19 @@ export default function Nav() {
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
+  // Escape로 메뉴 닫기 (포커스는 햄버거 버튼으로 되돌린다)
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
   // 홈+미스크롤 = 투명, 그 외 = 흰 배경
@@ -59,8 +73,11 @@ export default function Nav() {
 
         {/* 햄버거 */}
         <button
+          ref={menuButtonRef}
           onClick={() => setOpen((v) => !v)}
           aria-label="메뉴"
+          aria-expanded={open}
+          aria-controls="nav-menu"
           className="relative z-[60] flex flex-col items-center justify-center gap-[5px] w-9 h-9"
         >
           {[0, 1, 2].map((i) => (
@@ -84,6 +101,8 @@ export default function Nav() {
 
       {/* ── 풀스크린 오버레이 ── */}
       <div
+        id="nav-menu"
+        inert={!open}
         className={`fixed inset-0 z-40 bg-[#372a14] flex flex-col justify-center
           px-8 md:px-16 transition-opacity duration-500
           ${open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}

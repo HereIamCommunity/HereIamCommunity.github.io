@@ -15,10 +15,13 @@ function isOverlapping(checkIn: string, checkOut: string, ranges: DateRange[]): 
 }
 
 const rooms = [
-  { id: "nagnae", name: "나그네방", price: 60000, desc: "혼자 떠나온 여행자를 위한 아늑한 방", capacity: "1인" },
-  { id: "oksun",  name: "옥순방",   price: 120000, desc: "둘이 함께 머물기 좋은 편안한 방",      capacity: "1~2인" },
-  { id: "yeutae", name: "여태방",   price: 160000, desc: "넉넉한 공간에서 여유롭게 머무는 방",    capacity: "2~3인" },
+  { id: "nagnae", name: "나그네방", price: 60000, desc: "혼자 떠나온 여행자를 위한 아늑한 방", capacity: "1인", maxGuests: 1 },
+  { id: "oksun",  name: "옥순방",   price: 120000, desc: "둘이 함께 머물기 좋은 편안한 방",      capacity: "1~2인", maxGuests: 2 },
+  { id: "yeutae", name: "여태방",   price: 160000, desc: "넉넉한 공간에서 여유롭게 머무는 방",    capacity: "최대 4인", maxGuests: 4 },
 ];
+
+// 객실 미선택 시 선택 가능한 최대 인원 (전 객실 중 최대값)
+const MAX_GUESTS_ANY = Math.max(...rooms.map((r) => r.maxGuests));
 
 type Step = "form" | "done";
 
@@ -52,6 +55,7 @@ export default function StayBookingForm() {
 
   const blockedRanges = availability[selected] ?? [];
   const room = rooms.find((r) => r.id === selected);
+  const maxGuests = room?.maxGuests ?? MAX_GUESTS_ANY;
 
   const nights =
     form.checkIn && form.checkOut
@@ -233,6 +237,8 @@ export default function StayBookingForm() {
                 checked={selected === r.id}
                 onChange={() => {
                   setSelected(r.id);
+                  // 새 객실 정원보다 많이 선택돼 있으면 정원까지 내린다
+                  setForm((f) => (Number(f.count) > r.maxGuests ? { ...f, count: String(r.maxGuests) } : f));
                   if (form.checkIn && form.checkOut) {
                     setDateConflict(isOverlapping(form.checkIn, form.checkOut, availability[r.id] ?? []));
                   }
@@ -307,7 +313,9 @@ export default function StayBookingForm() {
           onChange={(e) => setForm({ ...form, count: e.target.value })}
           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#ff6b35]"
         >
-          {[1, 2, 3].map((n) => <option key={n} value={n}>{n}명</option>)}
+          {Array.from({ length: maxGuests }, (_, i) => i + 1).map((n) => (
+            <option key={n} value={n}>{n}명</option>
+          ))}
         </select>
       </div>
 

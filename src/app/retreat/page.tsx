@@ -261,6 +261,9 @@ export default function RetreatPage() {
             로컬호스트 하영<br />
             청소년기 잊지 못할 여름날의 72시간
           </p>
+          <p className="inline-block bg-white text-[#372a14] text-[11px] font-semibold tracking-wider px-3 py-1 rounded-full mb-3">
+            전 회차 마감 · 대기 신청 접수 중
+          </p>
           <p className="text-white/35 text-sm mb-10">
             초등학교 5학년 – 고등학교 1학년 · 회차별 6명 모집 · 참가비 44만원
           </p>
@@ -268,7 +271,7 @@ export default function RetreatPage() {
             href="#apply"
             className="inline-block px-8 py-3.5 bg-[#ff6b35] text-white text-sm font-semibold rounded-full hover:bg-[#e55a25] transition-colors"
           >
-            신청하러 가기 ↓
+            대기 신청하기 ↓
           </a>
         </div>
       </section>

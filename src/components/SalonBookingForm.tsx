@@ -476,7 +476,7 @@ export default function SalonBookingForm() {
   };
 
   return (
-    <div id="booking" className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm scroll-mt-20">
+    <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm scroll-mt-20">
       <h3 className="text-lg font-bold text-[#372a14] mb-1">프로그램 신청</h3>
       <p className="text-sm text-gray-400 mb-7">참가할 프로그램과 날짜를 선택하세요.</p>
 
