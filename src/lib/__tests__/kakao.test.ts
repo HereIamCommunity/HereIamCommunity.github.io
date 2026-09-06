@@ -264,10 +264,12 @@ describe("buildHostMessage", () => {
 /* ─── 발송 규칙 (순수 함수) ─────────────────────── */
 
 describe("planMessages — 발송 대상 결정", () => {
-  it("게스트 템플릿이 없으면 게스트도 호스트도 보내지 않는다", () => {
+  it("게스트 템플릿이 없으면 게스트는 건너뛰고 호스트는 문자로 보낸다", () => {
     const plan = planMessages("received", salon, { hasHostRecipient: true });
     expect(plan.guest).toBeUndefined();
-    expect(plan.host).toBeUndefined();
+    expect(plan.host).toBeDefined();
+    expect(plan.host?.kakaoOptions).toBeUndefined();
+    expect(plan.host?.text).toContain("새 신청");
   });
 
   it("게스트 템플릿이 있으면 게스트와 호스트를 함께 보낸다", () => {

@@ -259,8 +259,10 @@ export function planMessages(
 
   if (opts.hostOnly) return { host };
 
+  // 호스트는 템플릿과 무관하게 항상 문자로 받는다(운영 알림).
+  // 게스트는 알림톡 템플릿이 있을 때만 (검수 전 차단).
   const guest = buildGuestMessage(event, booking);
-  if (!isSendable(guest)) return {};
+  if (!isSendable(guest)) return { host };
 
   return { guest, host };
 }
