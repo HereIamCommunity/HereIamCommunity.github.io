@@ -19,7 +19,7 @@ import { SolapiMessageService } from "solapi";
 
 /* ─── 문안 상수 ─────────────────────────────────── */
 const BANK_ACCOUNT = "하나은행 5539-10-13844507 (코이노니아)";
-const INSTAGRAM = "@koinonia_andong";
+const CONTACT_PHONE = "010-2608-9144";
 const STAY_CHECKIN_TIME = "15:00";
 const STAY_CHECKOUT_TIME = "11:00";
 
@@ -118,7 +118,7 @@ function salonReceived(b: Booking): BuiltMessage {
     BANK_ACCOUNT,
     `입금자명: ${b.name}`,
     ``,
-    `입금이 확인되면 확정 안내를 다시 보내드립니다.`,
+    `감사합니다. 코이노니아에서 함께할 날을 기다리고 있을게요 🌿`,
   ].join("\n");
   return { text, kakaoOptions: kakaoOptions(process.env.KAKAO_TEMPLATE_SALON_RECEIVED, variables) };
 }
@@ -147,7 +147,7 @@ function stayReceived(b: Booking): BuiltMessage {
     BANK_ACCOUNT,
     `입금자명: ${b.name}`,
     ``,
-    `입금이 확인되면 확정 안내를 다시 보내드립니다.`,
+    `감사합니다. 안동에서 뵐 날을 설레는 마음으로 기다리고 있을게요 🌿`,
   ].join("\n");
   return { text, kakaoOptions: kakaoOptions(process.env.KAKAO_TEMPLATE_STAY_RECEIVED, variables) };
 }
@@ -166,9 +166,9 @@ function salonConfirmed(b: Booking): BuiltMessage {
     `일시: ${b.date ?? ""}`,
     `장소: 코이노니아 (경북 안동시)`,
     ``,
-    `당일 일정 변경이 필요하시면 인스타그램 ${INSTAGRAM} 으로 미리 연락 부탁드립니다.`,
+    `당일 일정 변경이 필요하시면 ${CONTACT_PHONE} 으로 미리 연락 부탁드립니다.`,
     ``,
-    `코이노니아에서 뵙겠습니다.`,
+    `함께해 주셔서 진심으로 감사해요. 코이노니아에서 즐거운 시간 되시길 바랍니다 🎉`,
   ].join("\n");
   return { text, kakaoOptions: kakaoOptions(process.env.KAKAO_TEMPLATE_SALON_CONFIRMED, variables) };
 }
@@ -191,9 +191,9 @@ function stayConfirmed(b: Booking): BuiltMessage {
     `체크아웃: ${b.checkOut ?? ""} ${STAY_CHECKOUT_TIME} (${nights}박)`,
     ``,
     `체크인 전날 입실 방법과 스테이 가이드를 다시 안내드립니다.`,
-    `숙박 관련 문의는 언제든 편하게 연락 주세요.`,
+    `숙박 관련 문의는 ${CONTACT_PHONE} 으로 언제든 편하게 연락 주세요.`,
     ``,
-    `안동에서 뵙겠습니다.`,
+    `안동에서 따뜻하게 맞이할게요. 편안한 쉼이 되시길 바랍니다 🌿`,
   ].join("\n");
   return { text, kakaoOptions: kakaoOptions(process.env.KAKAO_TEMPLATE_STAY_CONFIRMED, variables) };
 }
@@ -212,10 +212,9 @@ function cancelled(b: Booking): BuiltMessage {
     `■ 취소 내역`,
     detail,
     ``,
-    `이미 입금하신 경우 환불 안내를 별도로 드립니다.`,
-    `문의: 인스타그램 ${INSTAGRAM}`,
+    `문의: ${CONTACT_PHONE}`,
     ``,
-    `다음에 다시 뵙기를 기다리겠습니다.`,
+    `다음에 꼭 함께해요! 코이노니아는 언제든 기다리고 있을게요 🌿`,
   ].join("\n");
   return { text, kakaoOptions: kakaoOptions(process.env.KAKAO_TEMPLATE_CANCELLED, variables) };
 }

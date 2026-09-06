@@ -123,7 +123,7 @@ export async function sendGuestConfirmation(data: BookingData) {
         </table>
         ${paymentBlock}
         <p style="font-size:12px;color:#9ca3af;margin-top:20px">
-          문의는 인스타그램 <a href="https://instagram.com/koinonia_andong" style="color:#ff6b35">@koinonia_andong</a>으로 연락주세요.
+          문의는 <a href="tel:01026089144" style="color:#ff6b35">010-2608-9144</a> 로 연락주세요.
         </p>
       </div>
       <p style="font-size:11px;color:#d1d5db;text-align:center;margin-top:16px">
@@ -191,7 +191,7 @@ export async function sendRetreatConfirmation({
         </p>
 
         <p style="font-size:12px;color:#9ca3af;border-top:1px solid #f3f4f6;padding-top:16px;margin:0">
-          문의는 인스타그램 <a href="https://instagram.com/koinonia_andong" style="color:#ff6b35">@koinonia_andong</a>으로 연락주세요.<br />
+          문의는 <a href="tel:01026089144" style="color:#ff6b35">010-2608-9144</a> 로 연락주세요.<br />
           경북 안동시 중앙로 57 · koinonia-web.vercel.app
         </p>
       </div>
