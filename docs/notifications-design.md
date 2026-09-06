@@ -14,7 +14,7 @@
 | `confirmed` | `/api/admin/status` (입금확인) 또는 `/api/payment/confirm` (토스 승인) | 확정 안내 | 확정 처리 알림 |
 | `cancelled` | `/api/admin/status` (취소) | 취소 안내 | 취소 처리 알림 |
 
-- 기존 cron 문자(`stay-reminder` D-1, `stay-checkout` 당일)는 이번 범위 밖. 그대로 유지.
+- cron D-1(`stay-reminder`)·체크아웃 당일(`stay-checkout`)도 템플릿 env가 있으면 알림톡으로 나간다(없으면 기존처럼 문자). 2026-09-06 등록본 7·8번.
 - 리트릿·오픈스테이 폼은 이번 범위 밖 (살롱·스테이만).
 
 ## 3. 솔라피 연결 설계
@@ -41,7 +41,7 @@ Vercel Function (Node.js, Fluid Compute)
 1. **API 키**: 콘솔 > API Key 관리 > 키 발급 → `SOLAPI_API_KEY`, `SOLAPI_API_SECRET`
 2. **발신번호 등록**: 콘솔 > 발신번호 관리 > 등록·인증 → `SOLAPI_SENDER_PHONE` (하이픈 없이). 문자 대체 발송에 필수.
 3. **카카오 채널 연동**: 콘솔 > 카카오 채널 관리 > 채널 연동 → 채널 검색용 ID로 연동 → 발급된 `pfId` → `KAKAO_PFID`
-4. **알림톡 템플릿 6개 등록**: `docs/alimtalk-templates.md`의 문안·변수 그대로 등록 → 검수 요청 → 승인 후 템플릿 ID를 `KAKAO_TEMPLATE_*` 6개에 입력
+4. **알림톡 템플릿 8개 등록** (완료, 검수 중): `docs/alimtalk-templates.md`의 레지스트리 표 참고 → 승인 후 템플릿 ID를 `KAKAO_TEMPLATE_*` 8개에 입력 (`KAKAO_TEMPLATE_HOST`는 선택)
 5. **잔액 충전** 및 자동충전 설정 권장.
 
 ### 3.3 Vercel 환경변수
@@ -54,16 +54,20 @@ Vercel 대시보드 > Project > Settings > Environment Variables. **Production�
 | `SOLAPI_API_SECRET` | 솔라피 인증 | 기존 |
 | `SOLAPI_SENDER_PHONE` | 발신번호 | 기존, 하이픈 없이 |
 | `KAKAO_PFID` | 카카오 채널 ID | 기존 |
-| `KAKAO_TEMPLATE_SALON_RECEIVED` | 살롱 접수 | 신규 |
-| `KAKAO_TEMPLATE_STAY_RECEIVED` | 스테이 접수 | 신규 |
-| `KAKAO_TEMPLATE_SALON_CONFIRMED` | 살롱 확정 | 신규 |
-| `KAKAO_TEMPLATE_STAY_CONFIRMED` | 스테이 확정 | 신규 |
-| `KAKAO_TEMPLATE_CANCELLED` | 취소 안내 (게스트 공통) | 신규 |
-| `KAKAO_TEMPLATE_HOST` | 호스트 알림 (공통) | 신규 |
+| `KAKAO_TEMPLATE_SALON_RECEIVED` | 1. 살롱 접수 | `KA01TP260906111616282uwVQwrob8OX` |
+| `KAKAO_TEMPLATE_SALON_CONFIRMED` | 2. 살롱 확정 | `KA01TP260906111937411oOGf3DvHzvk` |
+| `KAKAO_TEMPLATE_SALON_CANCELLED` | 3. 살롱 취소 | `KA01TP260906112315549mUsVO3mwUOp` |
+| `KAKAO_TEMPLATE_STAY_RECEIVED` | 4. 스테이 접수 | `KA01TP260906113200151llfNLykPo8D` |
+| `KAKAO_TEMPLATE_STAY_CONFIRMED` | 5. 스테이 확정 | `KA01TP260906113427164x8hMIBrOnlo` |
+| `KAKAO_TEMPLATE_STAY_CANCELLED` | 6. 스테이 취소 | `KA01TP260906145135509OW6gQGoG34u` |
+| `KAKAO_TEMPLATE_STAY_REMINDER` | 7. 스테이 체크인 D-1 (cron) | `KA01TP2609061459009997cIwUSazlQn` |
+| `KAKAO_TEMPLATE_STAY_CHECKOUT` | 8. 스테이 체크아웃 당일 (cron) | `KA01TP2609061500047704yNnPWcl2KG` |
+| `KAKAO_TEMPLATE_HOST` | 호스트 알림 | **선택** — 미등록. 없으면 호스트는 문자 |
 | `OPERATOR_PHONE` | 호스트 수신번호 | 기존, 하이픈 없이 |
 | `ADMIN_PASSWORD` | 어드민 인증 | 기존 |
 
-기존 `KAKAO_TEMPLATE_SALON`, `KAKAO_TEMPLATE_STAY`는 더 이상 읽지 않는다. 남아 있어도 무해.
+템플릿 ID·본문·변수명은 `docs/alimtalk-templates.md`가 정본이고, 원본 덤프는 `phases/notify/solapi-templates.json`이다.
+기존 `KAKAO_TEMPLATE_CANCELLED`(살롱·스테이 공통)는 살롱/스테이로 갈라져 더 이상 읽지 않는다. `KAKAO_TEMPLATE_SALON`, `KAKAO_TEMPLATE_STAY`도 마찬가지. 남아 있어도 무해.
 
 ### 3.4 연결 확인 (어드민 테스트 발송)
 

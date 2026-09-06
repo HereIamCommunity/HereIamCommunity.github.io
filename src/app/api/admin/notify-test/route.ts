@@ -14,14 +14,17 @@ const REQUIRED = [
   "OPERATOR_PHONE",
 ];
 
+// 솔라피에 등록된 템플릿 8개 (docs/alimtalk-templates.md).
+// KAKAO_TEMPLATE_HOST는 선택이라 뺀다. 채널 pfId는 아래에서 따로 본다.
 const KAKAO_ENV = [
-  "KAKAO_PFID",
   "KAKAO_TEMPLATE_SALON_RECEIVED",
-  "KAKAO_TEMPLATE_STAY_RECEIVED",
   "KAKAO_TEMPLATE_SALON_CONFIRMED",
+  "KAKAO_TEMPLATE_SALON_CANCELLED",
+  "KAKAO_TEMPLATE_STAY_RECEIVED",
   "KAKAO_TEMPLATE_STAY_CONFIRMED",
-  "KAKAO_TEMPLATE_CANCELLED",
-  "KAKAO_TEMPLATE_HOST",
+  "KAKAO_TEMPLATE_STAY_CANCELLED",
+  "KAKAO_TEMPLATE_STAY_REMINDER",
+  "KAKAO_TEMPLATE_STAY_CHECKOUT",
 ];
 
 export async function POST(req: NextRequest) {
@@ -31,7 +34,7 @@ export async function POST(req: NextRequest) {
   }
 
   const missingRequired = REQUIRED.filter((k) => !process.env[k]);
-  const missingKakao = KAKAO_ENV.filter((k) => !process.env[k]);
+  const missingKakao = ["KAKAO_PFID", ...KAKAO_ENV].filter((k) => !process.env[k]);
 
   if (missingRequired.length > 0) {
     return NextResponse.json(
@@ -64,7 +67,7 @@ export async function POST(req: NextRequest) {
     missingKakao,
     kakaoMode: missingKakao.length === 0
       ? "알림톡 (실패 시 문자 대체)"
-      : "발송 안 함 — 템플릿 env 설정 전까지 모든 알림이 건너뜀",
+      : "게스트 알림톡 발송 안 함 (템플릿 env 미설정) · 호스트에는 문자 발송",
     sentTo: process.env.OPERATOR_PHONE,
     result,
     preview: {
