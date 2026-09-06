@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appendBooking } from "@/lib/sheets";
-import { sendOperatorSMS, sendGuestSMS } from "@/lib/notify";
-import { sendSalonKakao, sendStayKakao } from "@/lib/kakao";
+import { notifyBooking } from "@/lib/messaging";
 import { sendOperatorAlert, sendGuestConfirmation } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
@@ -27,21 +26,7 @@ export async function POST(req: NextRequest) {
       memo: data.memo,
     };
 
-    // ── 1. 게스트 SMS 먼저 발송하고 결과를 기록 ──────────
-    const hhmm = new Date().toLocaleTimeString("ko-KR", {
-      timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit",
-    });
-    let notifyStatus = "";
-    try {
-      await sendGuestSMS(bookingPayload);
-      notifyStatus = `✅ ${hhmm}`;
-      console.log("[NOTIFY] ✓ 게스트 SMS");
-    } catch (e) {
-      notifyStatus = "❌ 실패";
-      console.error("[NOTIFY] ✗ 게스트 SMS", e);
-    }
-
-    // ── 2. 구글 시트에 저장 (알림 상태 포함) ─────────────
+    // ── 1. 구글 시트에 저장 (알림 실패가 저장을 막지 않도록 먼저) ──
     await appendBooking({
       type: data.type,
       createdAt,
@@ -57,10 +42,29 @@ export async function POST(req: NextRequest) {
       totalAmount: data.totalAmount,
       memo: data.memo,
       status: "신청",
-      notifyStatus,
     });
 
-    // ── 3. 나머지 알림 (운영자 이메일 / 게스트 이메일) ────
+    // ── 2. 접수 알림톡/문자 발송 + O열 기록 ─────────────
+    try {
+      await notifyBooking("received", {
+        type: data.type === "salon" ? "salon" : "stay",
+        createdAt,
+        name: data.name,
+        phone: data.phone,
+        program: data.program,
+        date: data.date,
+        room: data.room,
+        checkIn: data.checkIn,
+        checkOut: data.checkOut,
+        nights: data.nights ? Number(data.nights) : undefined,
+        discount: data.discount ?? "none",
+        totalAmount: data.totalAmount ?? 0,
+      });
+    } catch (e) {
+      console.error("[NOTIFY] ✗ 접수 알림", e);
+    }
+
+    // ── 3. 이메일 (운영자 / 게스트) ────────────────────
     const notify = async (label: string, fn: () => Promise<void>) => {
       try {
         await fn();

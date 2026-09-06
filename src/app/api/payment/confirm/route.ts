@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appendBooking } from "@/lib/sheets";
 import { sendOperatorAlert, sendGuestConfirmation } from "@/lib/email";
-import { sendOperatorSMS, sendGuestSMS } from "@/lib/notify";
+import { notifyBooking } from "@/lib/messaging";
 
 const TOSS_SECRET_KEY = process.env.TOSS_SECRET_KEY ?? "test_sk_zXLkKEypNArWmo50nX3lmeaxYG5R";
 
@@ -41,20 +41,7 @@ export async function POST(req: NextRequest) {
       totalAmount: amount,
     };
 
-    // 게스트 SMS 먼저 발송하고 결과를 기록
-    const hhmm = new Date().toLocaleTimeString("ko-KR", {
-      timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit",
-    });
-    let notifyStatus = "";
-    try {
-      await sendGuestSMS(payload);
-      notifyStatus = `✅ ${hhmm}`;
-    } catch (e) {
-      notifyStatus = "❌ 실패";
-      console.error("[NOTIFY] ✗ 게스트 SMS (결제)", e);
-    }
-
-    // 예약 저장 (알림 상태 포함)
+    // 예약 저장 (알림 실패가 저장을 막지 않도록 먼저)
     await appendBooking({
       type: bookingData.type,
       createdAt,
@@ -70,14 +57,32 @@ export async function POST(req: NextRequest) {
       totalAmount: amount,
       memo: `[카드결제완료] ${tossData.method ?? ""} · ${tossData.cardNumber ?? tossData.virtualAccount?.accountNumber ?? ""}`,
       status: "결제완료",
-      notifyStatus,
     });
 
-    // ── 3. 나머지 알림 발송 ────────────────────────
+    // ── 3. 확정 알림톡/문자 발송 + O열 기록 ─────────
+    try {
+      await notifyBooking("confirmed", {
+        type: bookingData.type === "salon" ? "salon" : "stay",
+        createdAt,
+        name: bookingData.name,
+        phone: bookingData.phone,
+        program: bookingData.program,
+        date: bookingData.date,
+        room: bookingData.room,
+        checkIn: bookingData.checkIn,
+        checkOut: bookingData.checkOut,
+        nights: bookingData.nights ? Number(bookingData.nights) : undefined,
+        discount: bookingData.discount ?? "none",
+        totalAmount: amount,
+      });
+    } catch (e) {
+      console.error("[NOTIFY] ✗ 결제 확정 알림", e);
+    }
+
+    // ── 4. 이메일 ──────────────────────────────────
     await Promise.allSettled([
       sendOperatorAlert(payload),
       sendGuestConfirmation(payload),
-      sendOperatorSMS(payload),
     ]);
 
     return NextResponse.json({

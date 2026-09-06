@@ -109,6 +109,19 @@ function getDailyStats(rows: Row[]) {
   return Object.entries(map);
 }
 
+type RowMsg = { ok: boolean; text: string };
+
+function rowKey(row: Row) {
+  return `${row[0] ?? ""}|${row[3] ?? ""}`;
+}
+
+function sendResultLabel(r: unknown): string {
+  if (r === "ok") return "성공";
+  if (r === "skipped") return "건너뜀";
+  if (r && typeof r === "object" && "error" in r) return `실패 (${(r as { error: string }).error})`;
+  return "-";
+}
+
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
@@ -125,7 +138,10 @@ export default function AdminPage() {
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
   const [calRoom, setCalRoom] = useState<"nagnae" | "oksun" | "yeutae">("nagnae");
-  const [resending, setResending] = useState<number | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [rowMsg, setRowMsg] = useState<Record<string, RowMsg>>({});
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<RowMsg | null>(null);
 
   useEffect(() => {
     if (tab === "스테이" && authed) {
@@ -157,9 +173,22 @@ export default function AdminPage() {
     }
   };
 
-  const resend = async (row: Row, i: number) => {
-    if (!confirm(`${row[2]}님(${row[3]})에게 확정 안내 SMS를 재발송할까요?`)) return;
-    setResending(i);
+  const setMsg = (key: string, msg: RowMsg) =>
+    setRowMsg((prev) => ({ ...prev, [key]: msg }));
+
+  const notifySuffix = (notify: { guest?: unknown } | undefined) => {
+    const guest = notify?.guest;
+    if (guest === "ok") return " · 알림 발송됨";
+    if (guest === "skipped") return " · 알림 건너뜀 (환경변수 미설정)";
+    if (guest && typeof guest === "object" && "error" in guest) {
+      return ` · 알림 실패: ${(guest as { error: string }).error}`;
+    }
+    return "";
+  };
+
+  const resend = async (row: Row) => {
+    const key = rowKey(row);
+    setBusyKey(key);
     try {
       const res = await fetch("/api/admin/resend", {
         method: "POST",
@@ -167,12 +196,66 @@ export default function AdminPage() {
         body: JSON.stringify({ row }),
       });
       const j = await res.json();
-      if (j.ok) { alert("재발송 완료 ✅"); await load(password); }
-      else alert("재발송 실패: " + (j.error ?? res.status));
+      if (res.ok && j.ok) {
+        setMsg(key, { ok: true, text: `✅ 재발송 완료${notifySuffix(j.notify)}` });
+        await load(password);
+      } else {
+        setMsg(key, { ok: false, text: `❌ 재발송 실패: ${j.error ?? res.status}` });
+      }
     } catch (e) {
-      alert("오류: " + e);
+      setMsg(key, { ok: false, text: `❌ 오류: ${e}` });
     } finally {
-      setResending(null);
+      setBusyKey(null);
+    }
+  };
+
+  const changeStatus = async (row: Row, action: "confirm" | "cancel") => {
+    const key = rowKey(row);
+    setBusyKey(key);
+    try {
+      const res = await fetch("/api/admin/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": password },
+        body: JSON.stringify({ row, action }),
+      });
+      const j = await res.json();
+      if (res.ok && j.ok) {
+        setMsg(key, { ok: true, text: `✅ ${j.status}${notifySuffix(j.notify)}` });
+        await load(password);
+      } else {
+        setMsg(key, { ok: false, text: `❌ ${j.error ?? `실패 (${res.status})`}` });
+      }
+    } catch (e) {
+      setMsg(key, { ok: false, text: `❌ 오류: ${e}` });
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const runNotifyTest = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/admin/notify-test", {
+        method: "POST",
+        headers: { "x-admin-password": password },
+      });
+      const j = await res.json();
+      const lines: string[] = [];
+      if (j.error) lines.push(j.error);
+      if (j.missingRequired?.length) lines.push(`필수 환경변수 누락: ${j.missingRequired.join(", ")}`);
+      if (j.missingKakao?.length) lines.push(`알림톡 환경변수 누락: ${j.missingKakao.join(", ")}`);
+      if (j.kakaoMode) lines.push(`발송 모드: ${j.kakaoMode}`);
+      if (j.sentTo) lines.push(`수신번호: ${j.sentTo}`);
+      if (j.result) {
+        lines.push(`groupId: ${j.result.groupId ?? "-"}`);
+        lines.push(`게스트: ${sendResultLabel(j.result.guest)} / 호스트: ${sendResultLabel(j.result.host)}`);
+      }
+      setTestResult({ ok: !!j.ok, text: lines.join("\n") || "응답 없음" });
+    } catch (e) {
+      setTestResult({ ok: false, text: `오류: ${e}` });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -255,6 +338,13 @@ export default function AdminPage() {
           <div className="flex gap-3 items-center">
             <span className="text-xs text-gray-400">{rows.length}건 전체</span>
             <button
+              onClick={runNotifyTest}
+              disabled={testing}
+              className="text-sm text-[#ff6b35] border border-[#ff6b35]/40 px-4 py-2 rounded-full hover:border-[#ff6b35] transition-colors disabled:opacity-50"
+            >
+              {testing ? "발송중…" : "알림 테스트"}
+            </button>
+            <button
               onClick={() => load(password)}
               className="text-sm text-[#296973] border border-[#296973]/30 px-4 py-2 rounded-full hover:border-[#296973] transition-colors"
             >
@@ -262,6 +352,32 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
+
+        {/* 알림 테스트 결과 */}
+        {testResult && (
+          <div
+            className={`mb-6 rounded-2xl border px-5 py-4 ${
+              testResult.ok
+                ? "border-green-200 bg-green-50/60"
+                : "border-red-200 bg-red-50/60"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className={`text-sm font-medium mb-1 ${testResult.ok ? "text-green-700" : "text-red-600"}`}>
+                  {testResult.ok ? "알림 테스트 발송 완료" : "알림 테스트 실패"}
+                </p>
+                <pre className="text-xs text-gray-600 whitespace-pre-wrap font-sans leading-5">{testResult.text}</pre>
+              </div>
+              <button
+                onClick={() => setTestResult(null)}
+                className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 탭 */}
         <div className="flex gap-1 mb-6 border-b border-gray-200">
@@ -353,7 +469,7 @@ export default function AdminPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {["신청일시", "구분", "이름", "연락처", "프로그램/객실", "일시/체크인", "할인", "결제금액", "상태", "요청사항", "알림"].map((h) => (
+                    {["신청일시", "구분", "이름", "연락처", "프로그램/객실", "일시/체크인", "할인", "결제금액", "상태", "요청사항", "알림", "처리"].map((h) => (
                       <th key={h} className="text-left px-4 py-3 text-xs text-gray-400 font-medium whitespace-nowrap">
                         {h}
                       </th>
@@ -363,13 +479,13 @@ export default function AdminPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="text-center py-16 text-gray-400 text-sm">
+                      <td colSpan={12} className="text-center py-16 text-gray-400 text-sm">
                         {period !== "전체" ? `${period} 신청 내역이 없습니다.` : "신청 내역이 없습니다."}
                       </td>
                     </tr>
                   ) : (
                     filtered.map((row, i) => (
-                      <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                      <tr key={`${rowKey(row)}-${i}`} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                         <td className="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">{row[0]}</td>
                         <td className="px-4 py-3">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -416,17 +532,53 @@ export default function AdminPage() {
                           ) : (
                             <div className="flex items-center gap-1.5">
                               <span className="text-xs text-red-500">
-                                {row[14] === "❌ 실패" ? "실패" : "미발송"}
+                                {row[14]?.startsWith("❌") ? "실패" : "미발송"}
                               </span>
                               <button
-                                onClick={() => resend(row, i)}
-                                disabled={resending === i}
+                                onClick={() => resend(row)}
+                                disabled={busyKey === rowKey(row)}
                                 className="text-xs px-2 py-0.5 rounded-full border border-[#ff6b35] text-[#ff6b35] hover:bg-[#ff6b35]/10 disabled:opacity-40"
                               >
-                                {resending === i ? "발송중…" : "재발송"}
+                                {busyKey === rowKey(row) ? "처리중…" : "재발송"}
                               </button>
                             </div>
                           )}
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <div className="flex flex-col gap-1.5 min-w-[150px]">
+                            <div className="flex gap-1.5">
+                              {(row[13] || "신청") === "신청" && (
+                                <button
+                                  onClick={() => changeStatus(row, "confirm")}
+                                  disabled={busyKey === rowKey(row)}
+                                  className="text-xs px-2.5 py-1 rounded-full border border-green-500 text-green-600 hover:bg-green-50 disabled:opacity-40 whitespace-nowrap"
+                                >
+                                  {busyKey === rowKey(row) ? "처리중…" : "입금확인"}
+                                </button>
+                              )}
+                              {(row[13] ?? "") !== "취소" && (
+                                <button
+                                  onClick={() => changeStatus(row, "cancel")}
+                                  disabled={busyKey === rowKey(row)}
+                                  className="text-xs px-2.5 py-1 rounded-full border border-gray-300 text-gray-500 hover:bg-gray-50 disabled:opacity-40 whitespace-nowrap"
+                                >
+                                  {busyKey === rowKey(row) ? "처리중…" : "취소"}
+                                </button>
+                              )}
+                              {(row[13] ?? "") === "취소" && (
+                                <span className="text-xs text-gray-300">—</span>
+                              )}
+                            </div>
+                            {rowMsg[rowKey(row)] && (
+                              <span
+                                className={`text-xs leading-4 ${
+                                  rowMsg[rowKey(row)].ok ? "text-green-600" : "text-red-500"
+                                }`}
+                              >
+                                {rowMsg[rowKey(row)].text}
+                              </span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -434,9 +586,6 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-gray-400 text-center mt-4">
-              상태 변경(입금확인 처리 등)은 구글 시트에서 직접 수정해주세요.
-            </p>
           </>
         )}
 

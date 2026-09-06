@@ -93,9 +93,60 @@ export async function appendBooking(row: BookingRow) {
   });
 }
 
+type FoundBookingRow = {
+  sheets: ReturnType<typeof google.sheets>;
+  tabName: string;
+  rowNum: number;      // 1-based 시트 행 번호
+  values: string[];    // A~O 열
+};
+
 /**
- * 게스트 SMS 재발송/발송 결과를 예약 행의 '알림' 열(O)에 기록.
- * 신청일시(A) + 연락처(D)로 행을 찾고, 없으면 연락처만으로 최신 행 매칭.
+ * 예약 행 탐색 공통 로직.
+ * 1순위 신청일시(A) + 연락처(D) 정확 매칭, 2순위 연락처만으로 최신 행.
+ */
+async function findBookingRow(
+  type: string,
+  createdAt: string,
+  phone: string
+): Promise<FoundBookingRow | null> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return null;
+
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const tabName = type === "salon" || type === "살롱" ? "살롱" : "스테이";
+
+  const res = await sheets.spreadsheets.values
+    .get({ spreadsheetId: SPREADSHEET_ID, range: `${tabName}!A:O` })
+    .catch(() => ({ data: { values: [] as string[][] } }));
+  const rows = (res.data.values as string[][] | null) ?? [];
+  const strip = (p: string) => (p || "").replace(/\D/g, "");
+  const target = strip(phone);
+
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (rows[i][0] === createdAt && strip(rows[i][3]) === target) {
+      return { sheets, tabName, rowNum: i + 1, values: rows[i] };
+    }
+  }
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (strip(rows[i][3]) === target) {
+      return { sheets, tabName, rowNum: i + 1, values: rows[i] };
+    }
+  }
+  return null;
+}
+
+/** 예약 행(A~O)을 그대로 반환. 현재 상태 확인용. */
+export async function getBookingRow(
+  type: string,
+  createdAt: string,
+  phone: string
+): Promise<string[] | null> {
+  const found = await findBookingRow(type, createdAt, phone);
+  return found ? found.values : null;
+}
+
+/**
+ * 알림 발송 결과를 예약 행의 '알림' 열(O)에 기록.
  */
 export async function updateNotifyStatus(
   type: string,
@@ -103,43 +154,35 @@ export async function updateNotifyStatus(
   phone: string,
   status: string
 ): Promise<boolean> {
-  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return false;
+  const found = await findBookingRow(type, createdAt, phone);
+  if (!found) return false;
 
-  const auth = getAuth();
-  const sheets = google.sheets({ version: "v4", auth });
-  const tabName = type === "salon" || type === "살롱" ? "살롱" : "스테이";
+  await found.sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${found.tabName}!O${found.rowNum}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[status]] },
+  });
+  return true;
+}
 
-  const res = await sheets.spreadsheets.values
-    .get({ spreadsheetId: SPREADSHEET_ID, range: `${tabName}!A:D` })
-    .catch(() => ({ data: { values: [] as string[][] } }));
-  const rows = (res.data.values as string[][] | null) ?? [];
-  const stripPhone = (p: string) => (p || "").replace(/\D/g, "");
-  const target = stripPhone(phone);
+/** 예약 행의 '상태' 열(N)을 갱신. */
+export async function updateBookingStatus(
+  type: string,
+  createdAt: string,
+  phone: string,
+  status: string
+): Promise<boolean> {
+  const found = await findBookingRow(type, createdAt, phone);
+  if (!found) return false;
 
-  const writeO = async (rowNum: number) => {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${tabName}!O${rowNum}`,
-      valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[status]] },
-    });
-  };
-
-  // 1순위: 신청일시 + 연락처 정확 매칭
-  for (let i = rows.length - 1; i >= 1; i--) {
-    if (rows[i][0] === createdAt && stripPhone(rows[i][3]) === target) {
-      await writeO(i + 1);
-      return true;
-    }
-  }
-  // 2순위: 연락처만으로 최신 행
-  for (let i = rows.length - 1; i >= 1; i--) {
-    if (stripPhone(rows[i][3]) === target) {
-      await writeO(i + 1);
-      return true;
-    }
-  }
-  return false;
+  await found.sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${found.tabName}!N${found.rowNum}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[status]] },
+  });
+  return true;
 }
 
 /**
