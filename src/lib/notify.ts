@@ -69,14 +69,26 @@ export function buildCheckoutMessage(guest: { name: string }): BuiltMessage {
   };
 }
 
+/**
+ * 알림톡이 접수 단계에서 거부되면(템플릿 미승인·ID 오류 등, 이때는 솔라피의 문자 대체가 동작하지 않는다)
+ * 같은 본문을 문자로 다시 보낸다. 운영 중인 안내라 끊기지 않게 하기 위함.
+ */
 async function sendOne(to: string, message: BuiltMessage) {
   const client = getClient();
-  await client.send({
-    to: strip(to),
-    from: strip(process.env.SOLAPI_SENDER_PHONE!),
-    text: message.text,
-    ...(message.kakaoOptions ? { kakaoOptions: message.kakaoOptions } : {}),
-  });
+  const base = { to: strip(to), from: strip(process.env.SOLAPI_SENDER_PHONE!), text: message.text };
+  if (!message.kakaoOptions) {
+    await client.send(base);
+    return;
+  }
+  try {
+    await client.send({ ...base, kakaoOptions: message.kakaoOptions });
+  } catch (e) {
+    const failed = (e as { failedMessageList?: readonly { statusCode?: string; statusMessage?: string }[] })
+      ?.failedMessageList;
+    const reason = failed?.[0] ? `${failed[0].statusCode ?? ""} ${failed[0].statusMessage ?? ""}`.trim() : String(e);
+    console.warn(`[SMS] 알림톡 접수 거부 → 문자로 재발송 (${reason})`);
+    await client.send(base);
+  }
 }
 
 /* ─── 체크아웃 당일 안내 ────────────────────────── */
