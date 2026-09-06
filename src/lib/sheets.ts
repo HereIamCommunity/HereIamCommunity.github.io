@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { RETREAT_SESSIONS } from "@/lib/retreat-sessions";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID!;
@@ -186,6 +187,104 @@ export async function updateBookingStatus(
 }
 
 /**
+ * 예약 행의 '요청사항' 열(M)에 한 줄 덧붙인다 (취소 사유 기록 등).
+ * 기존 내용은 지우지 않고 줄바꿈으로 이어 쓴다.
+ */
+export async function appendBookingMemo(
+  type: string,
+  createdAt: string,
+  phone: string,
+  text: string
+): Promise<boolean> {
+  if (!text) return false;
+  const found = await findBookingRow(type, createdAt, phone);
+  if (!found) return false;
+
+  const prev = (found.values[12] ?? "").trim();
+  const next = prev ? `${prev}\n${text}` : text;
+
+  await found.sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${found.tabName}!M${found.rowNum}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[next]] },
+  });
+  return true;
+}
+
+/**
+ * 리트릿·무료개방처럼 "신청일시 + 연락처"로 행을 찾는 탭의 공통 탐색.
+ * 1순위 신청일시(A) + 연락처 정확 매칭, 2순위 연락처만으로 최신 행.
+ */
+async function findSimpleRow(
+  range: string,
+  phoneCol: number,
+  createdAt: string,
+  phone: string
+): Promise<{ sheets: ReturnType<typeof google.sheets>; rowNum: number; values: string[] } | null> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return null;
+
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+
+  const res = await sheets.spreadsheets.values
+    .get({ spreadsheetId: SPREADSHEET_ID, range })
+    .catch(() => ({ data: { values: [] as string[][] } }));
+  const rows = (res.data.values as string[][] | null) ?? [];
+  const strip = (p: string) => (p || "").replace(/\D/g, "");
+  const target = strip(phone);
+  if (!target) return null;
+
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (rows[i][0] === createdAt && strip(rows[i][phoneCol]) === target) {
+      return { sheets, rowNum: i + 1, values: rows[i] };
+    }
+  }
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (strip(rows[i][phoneCol]) === target) {
+      return { sheets, rowNum: i + 1, values: rows[i] };
+    }
+  }
+  return null;
+}
+
+/** 리트릿 행의 '상태' 열(M)을 갱신. */
+export async function updateRetreatStatus(
+  createdAt: string,
+  phone: string,
+  status: string
+): Promise<boolean> {
+  const found = await findSimpleRow("리트릿!A:M", 2, createdAt, phone);
+  if (!found) return false;
+
+  await found.sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `리트릿!M${found.rowNum}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[status]] },
+  });
+  return true;
+}
+
+/** 무료개방 행의 '상태' 열(L)을 갱신. */
+export async function updateOpenStayStatus(
+  createdAt: string,
+  phone: string,
+  status: string
+): Promise<boolean> {
+  const found = await findSimpleRow("무료개방!A:L", 2, createdAt, phone);
+  if (!found) return false;
+
+  await found.sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `무료개방!L${found.rowNum}`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[status]] },
+  });
+  return true;
+}
+
+/**
  * 살롱 + 스테이 탭을 합쳐서 반환 (어드민/cron용)
  * 헤더는 첫 행 한 번만 포함
  */
@@ -261,13 +360,8 @@ export async function appendRetreat(row: RetreatRow) {
     return;
   }
 
-  const SESSION_LABELS: Record<string, string> = {
-    s1: "1회차 7/3-5",
-    s2: "2회차 7/24-26",
-    s3: "3회차 7/30-8/1",
-    s4: "4회차 8/15-17",
-    s5: "5회차 8/21-23",
-  };
+  const label =
+    RETREAT_SESSIONS.find((s) => s.key === row.session)?.label ?? row.session;
 
   const auth = getAuth();
   const sheets = google.sheets({ version: "v4", auth });
@@ -285,7 +379,7 @@ export async function appendRetreat(row: RetreatRow) {
         row.phone,
         row.grade,
         row.region,
-        SESSION_LABELS[row.session] ?? row.session,
+        label,
         row.referral,
         row.question,
         row.memo,
@@ -332,13 +426,9 @@ export async function getRetreatCounts(): Promise<Record<string, number>> {
     const SESSION_COL = 5; // F열 (0-indexed)
 
     const counts: Record<string, number> = { s1: 0, s2: 0, s3: 0, s4: 0, s5: 0 };
-    const LABEL_TO_ID: Record<string, string> = {
-      "1회차 7/3-5": "s1",
-      "2회차 7/24-26": "s2",
-      "3회차 7/30-8/1": "s3",
-      "4회차 8/15-17": "s4",
-      "5회차 8/21-23": "s5",
-    };
+    const LABEL_TO_ID: Record<string, string> = Object.fromEntries(
+      RETREAT_SESSIONS.map((s) => [s.label, s.key])
+    );
 
     for (const row of rows) {
       if (row[0] === "신청일시") continue; // 헤더 스킵

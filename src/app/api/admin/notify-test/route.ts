@@ -3,8 +3,8 @@ import { buildGuestMessage, buildHostMessage, sendBookingMessages, type Booking 
 
 /**
  * 알림 연결 테스트.
- * 환경변수를 점검하고, 호스트 번호로 샘플 'received' 메시지를 실제 발송한 뒤
- * 솔라피 응답을 그대로 돌려준다.
+ * GET  — 발송 없이 환경변수만 점검한다 (어드민 설정 탭이 진입할 때마다 호출).
+ * POST — 호스트 번호로 샘플 'received' 메시지를 실제 발송하고 솔라피 응답을 돌려준다.
  */
 
 const REQUIRED = [
@@ -26,6 +26,38 @@ const KAKAO_ENV = [
   "KAKAO_TEMPLATE_STAY_REMINDER",
   "KAKAO_TEMPLATE_STAY_CHECKOUT",
 ];
+
+/** 010-1234-5678 → 010-****-5678 (설정 탭에 그대로 보여준다) */
+function maskPhone(phone: string | undefined): string | null {
+  const d = (phone ?? "").replace(/\D/g, "");
+  if (!d) return null;
+  if (d.length < 7) return "*".repeat(d.length);
+  return `${d.slice(0, 3)}-****-${d.slice(-4)}`;
+}
+
+function checkEnv() {
+  const missingRequired = REQUIRED.filter((k) => !process.env[k]);
+  const missingKakao = ["KAKAO_PFID", ...KAKAO_ENV].filter((k) => !process.env[k]);
+  return {
+    ok: missingRequired.length === 0,
+    missingRequired,
+    missingKakao,
+    kakaoMode:
+      missingKakao.length === 0
+        ? "알림톡 (실패 시 문자 대체)"
+        : "게스트 알림톡 발송 안 함 (템플릿 env 미설정) · 호스트에는 문자 발송",
+    operatorPhoneMasked: maskPhone(process.env.OPERATOR_PHONE),
+  };
+}
+
+/** 발송 없이 점검만. */
+export async function GET(req: NextRequest) {
+  const password = req.headers.get("x-admin-password");
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  return NextResponse.json(checkEnv());
+}
 
 export async function POST(req: NextRequest) {
   const password = req.headers.get("x-admin-password");

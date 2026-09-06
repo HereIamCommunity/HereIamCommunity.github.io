@@ -84,7 +84,12 @@ export function isConfirmed(status: string): boolean;   // 입금확인 | 결제
 export function isPending(status: string): boolean;     // "" | 신청
 export function ageDays(createdAt: string, now?: Date): number;
 ```
-- `src/app/api/cron/morning-digest/route.ts`는 `buildDigest`를 쓰도록 교체(로직 중복 제거, 메일 내용 동일).
+- `src/app/api/cron/morning-digest/route.ts`는 `buildDigest`를 쓰도록 교체(로직 중복 제거). 리트릿 신규 신청(메일의 "썸머캠프 신규 신청" 줄)만 `Digest`에 없어 크론이 따로 센다.
+- 구현하며 확정한 것 3가지:
+  1. `normalizeDate`가 `-` 구분자도 받는다 → `"2026-09-10 19:00"` → `"2026-09-10"`. (기존 크론 정규식은 `.`·공백만 받아서 이런 값을 통과시키지 못했다.)
+  2. `salonToday`는 F열이 연도 없는 라벨(`"9월 12일 (토) 20:00"` — 살롱 폼이 넣는 실제 형식)이면 `now`의 연도를 붙여 비교한다. 여러 날짜가 나열된 라벨은 첫 날짜만 본다.
+  3. `newYesterday`는 취소를 제외한다(기존 크론은 제외하지 않았다).
+  1·3 때문에 크론 메일의 "오늘 살롱 방문"·"어제 신규 신청" 숫자가 기존과 달라질 수 있다 — 둘 다 의도한 수정이다.
 
 ### `src/lib/retreat-sessions.ts` (Max)
 ```ts
@@ -101,6 +106,11 @@ body: { sheet?: "booking" | "retreat" | "open"; row: string[]; action: "confirm"
 res: { ok: true; status: string; notify?: NotifyResult } | { ok: false; error: string; status?: string }
 ```
 - `sheets.ts`: `updateRetreatStatus(createdAt, phone, status)`, `updateOpenStayStatus(createdAt, phone, status)`, `appendBookingMemo(type, createdAt, phone, text)` 추가. 열 위치는 `appendRetreat`/`appendOpenStay` 순서를 따른다.
+- 판정은 순수 함수 `resolveStatusAction(sheet, currentStatus, action)`(`src/lib/admin-actions.ts`)에 있다. 구현 세부 3가지:
+  1. **`reopen`은 이미 입금대기(`""` · `"신청"`)인 행에 오면 409.** 되돌릴 게 없다 → UI는 `isPending(status)`인 행에 [되돌리기]를 띄우지 않는다.
+  2. **booking `confirm` 409 메시지**는 `'{현재상태}' 상태는 입금확인으로 바꿀 수 없습니다. 되돌리기 후 다시 시도해주세요.` — 취소/결제완료 행은 `reopen` → `confirm` 2단계.
+  3. **retreat·open의 현재 상태는 body의 `row`에서 읽는다**(리트릿 `row[12]`, 무료개방 `row[11]`). booking만 시트를 다시 읽어 대조한다. 즉 리트릿·무료개방의 409는 화면이 들고 있는 값 기준 — 처리 후 목록 새로고침 필수.
+- 행을 못 찾으면 404 `{ ok:false, error:"시트에서 신청 행을 찾지 못했습니다." }`. `reason`은 booking `cancel`에서만 쓰이고, 기록에 실패해도 상태 변경은 성공으로 응답한다.
 
 ### `GET /api/admin/notify-test` (Max)
 - 발송 없이 `{ ok, missingRequired, missingKakao, kakaoMode, operatorPhoneMasked }` 반환. POST는 기존(실제 발송).
