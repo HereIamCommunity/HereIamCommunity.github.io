@@ -26,6 +26,7 @@ export function parseAdminRow(row: string[]): Booking {
     nights: row[7] ? Number(row[7]) : undefined,
     discount,
     totalAmount: parseInt((row[11] ?? "0").replace(/[^0-9]/g, "")) || 0,
+    via: (row[13] || "").trim() === "결제완료" ? "toss" : "admin",
   };
 }
 

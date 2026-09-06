@@ -23,6 +23,8 @@
 
 import { SolapiMessageService } from "solapi";
 
+const ADMIN_URL = "koinonia-web.vercel.app/admin";
+
 /* ─── 등록본 본문 (솔라피 덤프 content 그대로) ──── */
 // 1. [살롱] 신청 접수 시 · KA01TP260906111616282uwVQwrob8OX
 const TEXT_SALON_RECEIVED =
@@ -65,6 +67,8 @@ export type Booking = {
   discount?: string;
   totalAmount: number;
   createdAt?: string;
+  /** 이벤트를 일으킨 경로. 호스트 문자의 "어떤 액션" 문장에 쓴다. */
+  via?: "web" | "admin" | "toss";
 };
 
 export type KakaoOptions = {
@@ -211,11 +215,62 @@ export function buildGuestMessage(event: BookingEvent, booking: Booking): BuiltM
  * 호스트 메시지 조립 (순수 함수).
  * 등록 템플릿이 없어 기본은 문자다. KAKAO_TEMPLATE_HOST를 넣으면 알림톡으로 전환된다.
  */
-export function buildHostMessage(event: BookingEvent, booking: Booking): BuiltMessage {
-  const eventLabel = EVENT_LABEL[event];
+export type HostContext = {
+  /** 게스트 알림 발송 결과. 있으면 호스트 문자 끝에 안내를 덧붙인다. */
+  guestResult?: SendResult;
+  /** 액션 시각 (기본 now). 테스트용. */
+  at?: Date;
+};
+
+function kstStamp(d: Date) {
+  const md = d.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" })
+    .replace(/\s/g, "").replace(/\.$/, "").replace(".", "/");
+  const hm = d.toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${md} ${hm}`;
+}
+
+/** 호스트 문자용 예약 내용 줄들 */
+function hostDetailLines(b: Booking): string[] {
+  if (b.type === "salon") {
+    return [`프로그램: ${b.program ?? ""}`, `일시: ${b.date ?? ""}`];
+  }
+  const nights = b.nights ? ` (${b.nights}박)` : "";
+  return [`객실: ${b.room ?? ""}`, `체크인 ${b.checkIn ?? ""} ~ 체크아웃 ${b.checkOut ?? ""}${nights}`];
+}
+
+/** 누가 · 언제 · 무엇을 · 어떤 액션 — 한 문장 */
+function hostActionLine(event: BookingEvent, b: Booking, when: string): string {
+  const label = typeLabel(b);
+  if (event === "received") return `${b.name}님이 ${when}에 ${label}을 예약 신청했어요.`;
+  if (event === "confirmed") {
+    return b.via === "toss"
+      ? `${b.name}님이 ${when}에 ${label} 요금을 카드로 결제했어요. 예약이 자동 확정됐어요.`
+      : `${b.name}님의 ${label} 예약을 ${when}에 입금확인 처리했어요.`;
+  }
+  return `${b.name}님의 ${label} 예약을 ${when}에 취소 처리했어요.`;
+}
+
+/** 호스트가 다음에 할 일 + 게스트 알림 결과 */
+function hostNextLines(event: BookingEvent, ctx: HostContext): string[] {
+  const guest = ctx.guestResult;
+  const guestLine =
+    guest === undefined ? null
+    : guest === "ok" ? "게스트에게 안내 알림톡을 보냈어요."
+    : guest === "skipped" ? "게스트 알림은 아직 발송되지 않았어요 (템플릿 미설정)."
+    : `게스트 알림 발송 실패 (${guest.error.replace(/\.$/, "")}). 어드민에서 재발송해 주세요.`;
+  const next =
+    event === "received" ? "입금이 확인되면 어드민에서 '입금확인'을 눌러주세요."
+    : event === "confirmed" ? null
+    : "이미 입금된 건이면 환불 처리가 필요해요.";
+  return [guestLine, next].filter((x): x is string => !!x);
+}
+
+export function buildHostMessage(event: BookingEvent, booking: Booking, ctx: HostContext = {}): BuiltMessage {
+  const eventLabel = event === "confirmed" && booking.via === "toss" ? "카드결제 완료" : EVENT_LABEL[event];
   const label = typeLabel(booking);
   const detail = detailLine(booking);
   const amount = won(booking.totalAmount);
+  const when = kstStamp(ctx.at ?? new Date());
 
   const variables = {
     "#{event}": eventLabel,
@@ -226,13 +281,21 @@ export function buildHostMessage(event: BookingEvent, booking: Booking): BuiltMe
     "#{amount}": amount,
   };
 
+  const amountLine =
+    event === "received" ? `금액: ${amount}원 · 입금 대기`
+    : event === "confirmed" ? `금액: ${amount}원 · ${booking.via === "toss" ? "카드결제 완료" : "입금 확인"}`
+    : `금액: ${amount}원`;
+
   const text = [
     `[코이노니아] ${eventLabel} · ${label}`,
+    hostActionLine(event, booking, when),
     ``,
-    `이름: ${booking.name}`,
+    ...hostDetailLines(booking),
+    amountLine,
     `연락처: ${booking.phone}`,
-    `내용: ${detail}`,
-    `금액: ${amount}원`,
+    ``,
+    ...hostNextLines(event, ctx),
+    `${ADMIN_URL}`,
   ].join("\n");
 
   return { text, kakaoOptions: kakaoOptions(process.env.KAKAO_TEMPLATE_HOST, variables) };
@@ -305,62 +368,47 @@ export async function sendBookingMessages(
   const from = stripPhone(process.env.SOLAPI_SENDER_PHONE!);
   const guestTo = opts.hostOnly ? "" : stripPhone(booking.phone);
   let hostTo = stripPhone(process.env.OPERATOR_PHONE ?? "");
-  // 게스트와 호스트가 같은 번호면 솔라피가 중복 수신번호(1026)로 한 통을 실패 처리하므로
-  // 호스트 사본은 건너뛴다. (호스트가 직접 예약한 경우)
+  // 게스트와 호스트가 같은 번호면 솔라피가 중복 수신번호(1026)로 실패 처리하므로 호스트 사본은 건너뛴다.
   if (guestTo && hostTo === guestTo) hostTo = "";
 
-  const plan = planMessages(event, booking, {
-    hostOnly: opts.hostOnly,
-    hasHostRecipient: !!hostTo,
-  });
+  const plan = planMessages(event, booking, { hostOnly: opts.hostOnly, hasHostRecipient: !!hostTo });
+  const client = new SolapiMessageService(process.env.SOLAPI_API_KEY!, process.env.SOLAPI_API_SECRET!);
 
-  const messages: {
-    to: string;
-    from: string;
-    text: string;
-    kakaoOptions?: KakaoOptions;
-  }[] = [];
-
-  const guestPending = !!plan.guest && !!guestTo;
-  const hostPending = !!plan.host && !!hostTo;
-  if (guestPending) {
-    messages.push({ to: guestTo, from, text: plan.guest!.text, kakaoOptions: plan.guest!.kakaoOptions });
-  }
-  if (hostPending) {
-    messages.push({ to: hostTo, from, text: plan.host!.text, kakaoOptions: plan.host!.kakaoOptions });
+  // 1) 게스트 먼저 — 결과를 호스트 문자에 실어야 하므로 순서대로 보낸다.
+  let guest: SendResult = "skipped";
+  let groupId: string | undefined;
+  if (plan.guest && guestTo) {
+    const r = await sendSingle(client, { to: guestTo, from, text: plan.guest.text, kakaoOptions: plan.guest.kakaoOptions });
+    guest = r.result;
+    groupId = r.groupId;
+  } else if (!opts.hostOnly) {
+    console.warn(`[NOTIFY] 템플릿 미설정 — ${event} 게스트 발송 건너뜀`);
   }
 
-  if (messages.length === 0) {
-    console.warn(`[NOTIFY] 템플릿 미설정 — ${event} 발송 건너뜀`);
-    return { guest: "skipped", host: "skipped" };
+  // 2) 호스트 — 게스트 결과 포함
+  let host: SendResult = "skipped";
+  if (plan.host && hostTo) {
+    const m = buildHostMessage(event, booking, { guestResult: opts.hostOnly ? undefined : guest });
+    const r = await sendSingle(client, { to: hostTo, from, text: m.text, kakaoOptions: m.kakaoOptions });
+    host = r.result;
+    groupId = groupId ?? r.groupId;
   }
 
+  return { guest, host, groupId };
+}
+
+async function sendSingle(
+  client: SolapiMessageService,
+  msg: { to: string; from: string; text: string; kakaoOptions?: KakaoOptions }
+): Promise<{ result: SendResult; groupId?: string }> {
   try {
-    const client = new SolapiMessageService(
-      process.env.SOLAPI_API_KEY!,
-      process.env.SOLAPI_API_SECRET!
-    );
-    const res = await client.send(messages);
+    const res = await client.send(msg);
     const failed: readonly FailedEntry[] = res.failedMessageList ?? [];
-    return {
-      guest: guestPending ? failureOf(guestTo, failed) : "skipped",
-      host: hostPending ? failureOf(hostTo, failed) : "skipped",
-      groupId: res.groupInfo?.groupId,
-    };
+    return { result: failureOf(msg.to, failed), groupId: res.groupInfo?.groupId };
   } catch (e) {
-    // 전량 접수 실패 시 SDK가 MessageNotReceivedError 를 throw 한다.
-    // 건별 사유는 e.failedMessageList 에 있으므로 그걸 우선 쓴다.
+    // 전량 접수 실패 시 SDK가 MessageNotReceivedError 를 throw 한다. 건별 사유는 failedMessageList 에.
     const failed = (e as { failedMessageList?: readonly FailedEntry[] })?.failedMessageList;
-    if (Array.isArray(failed) && failed.length > 0) {
-      return {
-        guest: guestPending ? failureOf(guestTo, failed) : "skipped",
-        host: hostPending ? failureOf(hostTo, failed) : "skipped",
-      };
-    }
-    const error = e instanceof Error ? e.message : String(e);
-    return {
-      guest: guestPending ? { error } : "skipped",
-      host: hostPending ? { error } : "skipped",
-    };
+    if (Array.isArray(failed) && failed.length > 0) return { result: failureOf(msg.to, failed) };
+    return { result: { error: e instanceof Error ? e.message : String(e) } };
   }
 }

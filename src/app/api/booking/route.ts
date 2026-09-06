@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
         nights: data.nights ? Number(data.nights) : undefined,
         discount: data.discount ?? "none",
         totalAmount: data.totalAmount ?? 0,
+        via: "web",
       });
     } catch (e) {
       console.error("[NOTIFY] ✗ 접수 알림", e);

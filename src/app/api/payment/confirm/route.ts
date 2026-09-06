@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
         nights: bookingData.nights ? Number(bookingData.nights) : undefined,
         discount: bookingData.discount ?? "none",
         totalAmount: amount,
+        via: "toss",
       });
     } catch (e) {
       console.error("[NOTIFY] ✗ 결제 확정 알림", e);

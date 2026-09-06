@@ -29,6 +29,7 @@ describe("parseAdminRow", () => {
       nights: undefined,
       discount: "geot",
       totalAmount: 30000,
+      via: "admin",
     });
   });
 
@@ -46,6 +47,7 @@ describe("parseAdminRow", () => {
       nights: 2,
       discount: "nagnae",
       totalAmount: 150000,
+      via: "admin",
     });
   });
 
