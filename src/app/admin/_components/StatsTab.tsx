@@ -219,6 +219,9 @@ function BucketTable({ buckets, metric, scope }: { buckets: Bucket[]; metric: Me
             <th scope="col" className="whitespace-nowrap px-4 py-2.5 text-right text-xs font-medium text-gray-700">
               합계
             </th>
+            <th scope="col" className="whitespace-nowrap px-4 py-2.5 text-right text-xs font-medium text-gray-500">
+              신청
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -242,6 +245,9 @@ function BucketTable({ buckets, metric, scope }: { buckets: Bucket[]; metric: Me
                 )}
                 <td className="whitespace-nowrap px-4 py-2 text-right font-medium tabular-nums text-brown">
                   {(salon + stay).toLocaleString()}
+                </td>
+                <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-gray-500">
+                  {b.requested.toLocaleString()}건
                 </td>
               </tr>
             );
