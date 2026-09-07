@@ -5,6 +5,7 @@ import { isConfirmed, isPending, parseSheetDateTime } from "@/lib/digest";
 import BookingCard from "./BookingCard";
 import BookingDrawer from "./BookingDrawer";
 import BookingTable from "./BookingTable";
+import FilterGroup from "./FilterChips";
 import {
   bookingStatus,
   inPeriod,
@@ -19,51 +20,6 @@ import {
 const PERIODS: Period[] = ["오늘", "이번 주", "이번 달", "전체"];
 const TYPES: TypeFilter[] = ["전체", "살롱", "스테이"];
 const STATUSES: StatusFilter[] = ["전체", "입금대기", "확정", "취소"];
-
-function Chip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`min-h-[36px] whitespace-nowrap rounded-full border px-3.5 text-xs font-medium transition-colors ${
-        active ? "border-brown bg-brown text-white" : "border-gray-300 bg-white text-gray-700 hover:border-brown"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function FilterGroup({
-  legend,
-  options,
-  value,
-  onChange,
-}: {
-  legend: string;
-  options: readonly string[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <fieldset className="flex min-w-0 flex-wrap items-center gap-2">
-      <legend className="sr-only">{legend}</legend>
-      <span className="whitespace-nowrap text-xs text-gray-600">{legend}</span>
-      {options.map((o) => (
-        <Chip key={o} label={o} active={value === o} onClick={() => onChange(o)} />
-      ))}
-    </fieldset>
-  );
-}
 
 function matchStatus(status: string, filter: StatusFilter): boolean {
   if (filter === "전체") return true;

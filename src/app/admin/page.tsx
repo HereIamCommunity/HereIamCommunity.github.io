@@ -276,6 +276,7 @@ export default function AdminPage() {
   return (
     <AdminShell
       digest={digest}
+      rawRows={rawRows}
       rows={rows}
       retreats={retreats}
       openStays={openStays}

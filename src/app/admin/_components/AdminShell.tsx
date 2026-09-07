@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import type { Digest } from "@/lib/digest";
+import { buildStats } from "@/lib/stats";
 import Banner from "./Banner";
 import ListTab from "./ListTab";
 import OpenStayTab from "./OpenStayTab";
 import RetreatTab from "./RetreatTab";
 import SettingsTab from "./SettingsTab";
+import StatsTab from "./StatsTab";
 import StayCalendarTab from "./StayCalendarTab";
 import TodayTab from "./TodayTab";
 import type { ApiResult } from "./useAdminApi";
@@ -24,6 +26,7 @@ import {
 export const TABS = [
   { key: "today", label: "오늘" },
   { key: "list", label: "목록" },
+  { key: "stats", label: "통계" },
   { key: "stay", label: "스테이 캘린더" },
   { key: "retreat", label: "리트릿" },
   { key: "open", label: "무료개방" },
@@ -52,6 +55,7 @@ function headerDate(iso: string): string {
  */
 export default function AdminShell({
   digest,
+  rawRows,
   rows,
   retreats,
   openStays,
@@ -65,6 +69,8 @@ export default function AdminShell({
   topSlot,
 }: {
   digest: Digest;
+  /** 헤더 행을 포함한 예약 원본 — buildStats가 내부에서 slice(1) 한다 */
+  rawRows: Row[];
   rows: Row[];
   retreats: Row[];
   openStays: Row[];
@@ -211,6 +217,7 @@ export default function AdminShell({
             onFiltersChange={setListFilters}
           />
         )}
+        {tab === "stats" && <StatsTab stats={buildStats(rawRows)} loading={loading} />}
         {tab === "stay" && (
           <StayCalendarTab stayRows={stayRows} airbnbRanges={airbnbRanges} todayISO={digest.today} />
         )}

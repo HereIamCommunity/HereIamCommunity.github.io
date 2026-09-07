@@ -155,11 +155,12 @@ export function buildDigest(
   };
 }
 
-/* ─── 내부 헬퍼 ───────────────────────────── */
-
-function kstNow(): Date {
+/** 지금 시각을 "KST 벽시계를 로컬 필드에 담은 Date"로. */
+export function kstNow(): Date {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
 }
+
+/* ─── 내부 헬퍼 ───────────────────────────── */
 
 function toISODate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(

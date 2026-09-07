@@ -5,13 +5,16 @@ import type { Booking, BookingEvent } from "@/lib/kakao";
  * 열: 0신청일시 1구분 2이름 3연락처 4프로그램 5일시 6객실 7박수
  *     8체크인 9체크아웃 10할인 11금액 12요청사항 13상태 14알림
  */
+/** 할인 열(K)의 표기를 코드로. "멤버십 곁 (-20%)" → geot */
+export function discountKey(raw: string): "none" | "geot" | "nagnae" {
+  const s = raw || "";
+  if (s.includes("곁")) return "geot";
+  if (s.includes("나그네")) return "nagnae";
+  return "none";
+}
+
 export function parseAdminRow(row: string[]): Booking {
-  const discountRaw = row[10] || "";
-  const discount = discountRaw.includes("곁")
-    ? "geot"
-    : discountRaw.includes("나그네")
-    ? "nagnae"
-    : "none";
+  const discount = discountKey(row[10]);
 
   return {
     type: row[1] === "살롱" ? "salon" : "stay",
