@@ -81,8 +81,14 @@ export default function AdminShell({
   // 목록 탭 필터는 여기서 들고 있는다 — 탭을 왕복해도 필터·검색어가 살아 있어야 한다.
   const [listFilters, setListFilters] = useState<ListFilters>(DEFAULT_FILTERS);
 
+  // 헤더 스트립에서 열 때는 필터를 통째로 초기화한다 — 스트립 숫자와 목록 건수가 같은 조건이어야 한다.
+  // 확정은 digest.month(이번 달 신청) 기준, 입금대기는 전 기간 기준.
   const openList = (statusFilter: StatusFilter) => {
-    setListFilters((f) => ({ ...f, statusFilter }));
+    setListFilters({
+      ...DEFAULT_FILTERS,
+      statusFilter,
+      period: statusFilter === "확정" ? "이번 달" : "전체",
+    });
     setTab("list");
   };
 
@@ -126,24 +132,24 @@ export default function AdminShell({
           <button
             type="button"
             onClick={() => openList("확정")}
-            className="whitespace-nowrap py-1 underline decoration-gray-300 underline-offset-4 hover:decoration-orange"
+            className="whitespace-nowrap min-h-9 py-1.5 underline decoration-gray-300 underline-offset-4 hover:decoration-orange"
           >
             <span className="text-gray-500">이번 달 확정</span>{" "}
             <span className="font-medium text-brown tabular-nums">{digest.month.confirmedCount}건</span>
           </button>
-          <span aria-hidden="true" className="text-gray-400">
+          <span aria-hidden="true" className="text-gray-500">
             ·
           </span>
           <span className="whitespace-nowrap py-1 font-medium text-brown tabular-nums">
             {amountText(String(digest.month.confirmedAmount))}
           </span>
-          <span aria-hidden="true" className="text-gray-400">
+          <span aria-hidden="true" className="text-gray-500">
             ·
           </span>
           <button
             type="button"
             onClick={() => openList("입금대기")}
-            className="whitespace-nowrap py-1 underline decoration-gray-300 underline-offset-4 hover:decoration-orange"
+            className="whitespace-nowrap min-h-9 py-1.5 underline decoration-gray-300 underline-offset-4 hover:decoration-orange"
           >
             <span className="text-gray-500">입금대기</span>{" "}
             <span className="font-medium text-brown tabular-nums">{digest.pending.length}건</span>
