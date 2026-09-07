@@ -136,3 +136,40 @@ curl -s http://localhost:3001/ | grep -c "<nav"                 # ≥1 (공개 �
 ## 4. 범위 밖
 - 루트 레이아웃 route group 분리(파일 이동) — 동시 작업자 충돌 위험으로 이번엔 `SiteChrome` 방식.
 - 리트릿 회차 데이터 갱신(운영 결정 필요).
+
+## 5. 통계 탭 복원 (2026-09-07 운영 요청)
+
+C8의 "통계 탭 폐기"는 철회. 현황 파악용 **운영 통계 탭**을 7번째 탭으로 둔다 (탭 순서: 오늘 | 목록 | 통계 | 스테이 캘린더 | 리트릿 | 무료개방 | 설정).
+
+### 화면
+- 상단 컨트롤: 기간 `일별(최근 30일) / 월별(최근 12개월) / 연도별(전체)` · 지표 `건수 / 금액` · 구분 `전체 / 살롱 / 스테이`
+- 비교 카드 3개: 이번 달 vs 지난 달 · 올해 vs 작년 · 전년 동월 대비 — 값, 증감(±N, ±%)
+- 막대 그래프(CSS, 라이브러리 없음): 살롱·스테이 색으로 쌓은 막대. 각 막대 `aria-label`. 아래에 같은 데이터 **표**(기간 · 살롱 · 스테이 · 합계).
+- 하단 분석 3개: 살롱 프로그램별 확정 수(상위 10), 객실별 확정 박수, 할인 적용 비율(없음/곁/나그네)
+- 계산 기준 문구를 화면에 명시: "확정 = 입금확인·결제완료, 취소 제외. 신청 건수는 별도 표기."
+- 빈 상태: "아직 집계할 데이터가 없어요" + 기준 안내.
+
+### 계약 — `src/lib/stats.ts` (Max, 순수 함수, 테스트)
+```ts
+export type Bucket = { key: string; label: string; salonCount: number; stayCount: number; salonAmount: number; stayAmount: number; requested: number };
+//  key: 일별 "YYYY-MM-DD", 월별 "YYYY-MM", 연도별 "YYYY". label: "9/7", "2026-09" → "9월"(연도 바뀌면 "2026년 1월"), "2026년"
+export type Comparison = { label: string; current: number; previous: number; diff: number; pct: number | null; unit: "건" | "원" };
+export type Stats = {
+  daily: Bucket[];    // 최근 30일, 빈 날도 0으로 채움, 오래된 → 최신
+  monthly: Bucket[];  // 최근 12개월, 빈 달 0
+  yearly: Bucket[];   // 데이터가 있는 연도 전부(오름차순)
+  compare: { monthCount: Comparison; monthAmount: Comparison; yearCount: Comparison; yearAmount: Comparison; yoyMonthCount: Comparison; yoyMonthAmount: Comparison };
+  byProgram: { name: string; count: number; amount: number }[]; // 살롱 확정, count desc, 상위 10
+  byRoom: { room: string; nights: number; count: number; amount: number }[];
+  discount: { none: number; geot: number; nagnae: number };   // 확정 기준 건수
+  basis: { confirmedStatuses: string[]; excludes: string[] };
+};
+export function buildStats(bookings: string[][], now?: Date): Stats; // 헤더 행 포함 배열, 신청일시(A열) 기준 버킷팅, 확정 = isConfirmed(N열), 취소 제외, requested = 취소 제외 전체 신청 수
+```
+- 날짜 파싱은 `digest.ts`의 `parseSheetDateTime`/`normalizeDate` 재사용. 금액은 L열 숫자만 추출.
+- 헤더 스트립의 `digest.month`와 `stats.compare.monthCount.current`가 같은 값이어야 한다(테스트로 고정).
+
+### 화면 (Esther) — `src/app/admin/_components/StatsTab.tsx`
+- `dataviz` 스킬을 먼저 로드해 색·막대·축·툴팁 규칙을 따른다. 색은 토큰: 살롱 `bg-orange`, 스테이 `bg-teal`, 비교 증가 `text-teal-dark`, 감소 `text-orange-dark`(값 옆 아이콘/부호 병기, 색만으로 전달 금지).
+- 막대는 `div` 높이 비율. 컨테이너 `overflow-x-auto`, 일별 30개 막대는 최소 폭 확보(막대당 ≥ 16px + gap). 라벨 `whitespace-nowrap`, 긴 축은 격일/격월 라벨 생략.
+- AdminShell TABS에 `{ key: "stats", label: "통계" }` 추가, preview에도 반영.
