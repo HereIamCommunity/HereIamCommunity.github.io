@@ -6,7 +6,6 @@ import BookingCard from "./BookingCard";
 import StatusBadge from "./StatusBadge";
 import SummaryCard from "./SummaryCard";
 import {
-  amountText,
   bookingStatus,
   contentOf,
   shortDate,
@@ -71,13 +70,11 @@ export default function TodayTab({
   digest,
   actions,
   conflicts,
-  onGoList,
   onGoCalendar,
 }: {
   digest: Digest;
   actions: AdminActions;
   conflicts: { room: string; date: string }[];
-  onGoList: () => void;
   onGoCalendar: () => void;
 }) {
   const pending = digest.pending;
@@ -201,23 +198,6 @@ export default function TodayTab({
           ))}
         </ul>
       </Section>
-
-      <section aria-labelledby="today-month-h" className="space-y-2">
-        <h2 id="today-month-h" className="whitespace-nowrap text-sm font-medium text-brown">
-          이번 달 숫자
-        </h2>
-        <div className="grid grid-cols-2 gap-3">
-          <SummaryCard label="확정 건수" value={`${digest.month.confirmedCount}건`} tone="teal" />
-          <SummaryCard label="확정 금액" value={amountText(String(digest.month.confirmedAmount))} tone="orange" />
-        </div>
-        <p className="text-xs leading-5 break-keep text-gray-700">
-          입금확인·결제완료만 셉니다 (취소 제외). 전체 내역은{" "}
-          <button type="button" onClick={onGoList} className="underline">
-            목록 탭
-          </button>
-          에서 볼 수 있어요.
-        </p>
-      </section>
     </div>
   );
 }

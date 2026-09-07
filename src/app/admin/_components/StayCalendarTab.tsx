@@ -10,6 +10,7 @@ import {
   dayStatus,
   isoOf,
   shortDate,
+  telHref,
   toDateStr,
   type DateRange,
   type RoomKey,
@@ -172,6 +173,11 @@ export default function StayCalendarTab({
                   <span className="min-w-0 flex-1 whitespace-nowrap text-xs text-gray-700">
                     {shortDate(normalizeDate(row[8]))} → {shortDate(normalizeDate(row[9]))}
                   </span>
+                  {row[3] && (
+                    <a href={telHref(row[3])} className="whitespace-nowrap text-xs text-teal-dark underline">
+                      {row[3]}
+                    </a>
+                  )}
                   <StatusBadge status={bookingStatus(row)} />
                 </li>
               ))}

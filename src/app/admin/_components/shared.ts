@@ -116,6 +116,14 @@ export type Period = "오늘" | "이번 주" | "이번 달" | "전체";
 export type TypeFilter = "전체" | "살롱" | "스테이";
 export type StatusFilter = "전체" | "입금대기" | "확정" | "취소";
 
+/** 목록 탭 필터 — 탭을 왕복해도 유지되도록 AdminShell이 들고 있는다 */
+export type ListFilters = {
+  period: Period;
+  typeFilter: TypeFilter;
+  statusFilter: StatusFilter;
+  searchInput: string;
+};
+
 /** 신청일시 기준 기간 필터 */
 export function inPeriod(createdAt: string, period: Period, todayISO: string): boolean {
   if (period === "전체") return true;

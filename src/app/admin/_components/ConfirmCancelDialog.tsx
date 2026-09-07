@@ -28,15 +28,20 @@ export default function ConfirmCancelDialog({
   // 열릴 때마다 새로 mount 되므로(부모가 조건부 렌더) 사유는 항상 비어 있다.
   useEffect(() => {
     closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
+  // Escape는 window가 아니라 이 트리 안에서 처리하고 전파를 끊는다 —
+  // drawer 안에서 열렸을 때 drawer까지 같이 닫히면 안 된다.
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-brown/40 p-0 sm:items-center sm:p-6">
+    <div
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          onClose();
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-end justify-center bg-brown/40 p-0 sm:items-center sm:p-6"
+    >
       <button
         type="button"
         aria-label="닫기"

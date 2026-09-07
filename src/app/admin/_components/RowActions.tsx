@@ -117,6 +117,7 @@ export default function RowActions({
 
       {msg && !hideMsg && (
         <p
+          aria-live="polite"
           className={`min-w-0 max-w-[240px] whitespace-normal break-keep text-xs leading-4 ${msg.ok ? "text-teal-dark" : "text-brown"}`}
         >
           {msg.text}

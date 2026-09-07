@@ -101,12 +101,17 @@ export default function AdminPage() {
     }
   }, []);
 
-  const applyResult = useCallback((r: LoadResult) => {
+  /**
+   * keepMsg=true면 행 메시지를 지우지 않는다.
+   * 상태 변경·재발송 뒤의 재조회에서 "확정 · 알림 실패: …" 같은 결과를
+   * 운영자가 읽기 전에 화면이 지워버리던 문제(6초 자동 페이드는 그대로).
+   */
+  const applyResult = useCallback((r: LoadResult, opts?: { keepMsg?: boolean }) => {
     if (r.kind === "ok") {
       setRawRows(r.json.rows ?? []);
       setRawRetreats(r.json.retreats ?? []);
       setOpenStays((r.json.openStays ?? []).slice(1));
-      setRowMsg({});
+      if (!opts?.keepMsg) setRowMsg({});
       setAuthed(true);
       setLoginError("");
       setError("");
@@ -121,11 +126,11 @@ export default function AdminPage() {
   }, []);
 
   const load = useCallback(
-    async (pw: string) => {
+    async (pw: string, opts?: { keepMsg?: boolean }) => {
       setLoading(true);
       setError("");
       const r = await fetchAll(pw);
-      applyResult(r);
+      applyResult(r, opts);
       setLoading(false);
       return r.kind === "ok";
     },
@@ -191,7 +196,7 @@ export default function AdminPage() {
       const d = (res.data ?? {}) as { ok?: boolean; status?: string; error?: string; notify?: unknown };
       if (res.ok && d.ok) {
         setMsg(key, { ok: true, text: `${d.status ?? "처리 완료"}${notifySuffix(d.notify)}` });
-        await load(password);
+        await load(password, { keepMsg: true });
       } else {
         setMsg(key, { ok: false, text: d.error ?? `처리하지 못했어요 (${res.status})` });
       }
@@ -208,7 +213,7 @@ export default function AdminPage() {
       const d = (res.data ?? {}) as { ok?: boolean; error?: string; notify?: unknown };
       if (res.ok && d.ok) {
         setMsg(key, { ok: true, text: `재발송 완료${notifySuffix(d.notify)}` });
-        await load(password);
+        await load(password, { keepMsg: true });
       } else {
         setMsg(key, { ok: false, text: `재발송 실패: ${d.error ?? res.status}` });
       }

@@ -9,6 +9,7 @@ import {
   bookingStatus,
   inPeriod,
   type AdminActions,
+  type ListFilters,
   type Period,
   type Row,
   type StatusFilter,
@@ -77,19 +78,23 @@ export default function ListTab({
   actions,
   todayISO,
   loading,
-  requestedStatus,
+  filters,
+  onFiltersChange,
 }: {
   rows: Row[];
   actions: AdminActions;
   todayISO: string;
   loading: boolean;
-  requestedStatus?: StatusFilter;
+  filters: ListFilters;
+  onFiltersChange: (next: ListFilters) => void;
 }) {
-  const [period, setPeriod] = useState<Period>("전체");
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("전체");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(requestedStatus ?? "전체");
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
+  const { period, typeFilter, statusFilter, searchInput } = filters;
+  const set = <K extends keyof ListFilters>(key: K, value: ListFilters[K]) =>
+    onFiltersChange({ ...filters, [key]: value });
+
+  // 검색어는 부모가 들고 있고, 디바운스된 값만 여기서 만든다.
+  // 탭을 다시 열었을 때 200ms 동안 필터가 풀려 보이지 않게 초기값을 맞춰 둔다.
+  const [search, setSearch] = useState(() => searchInput.trim());
   const [selected, setSelected] = useState<Row | null>(null);
   const closeDrawer = useCallback(() => setSelected(null), []);
 
@@ -116,14 +121,24 @@ export default function ListTab({
   return (
     <div className="space-y-4">
       <div className="space-y-2.5">
-        <FilterGroup legend="구분" options={TYPES} value={typeFilter} onChange={(v) => setTypeFilter(v as TypeFilter)} />
+        <FilterGroup
+          legend="구분"
+          options={TYPES}
+          value={typeFilter}
+          onChange={(v) => set("typeFilter", v as TypeFilter)}
+        />
         <FilterGroup
           legend="상태"
           options={STATUSES}
           value={statusFilter}
-          onChange={(v) => setStatusFilter(v as StatusFilter)}
+          onChange={(v) => set("statusFilter", v as StatusFilter)}
         />
-        <FilterGroup legend="기간" options={PERIODS} value={period} onChange={(v) => setPeriod(v as Period)} />
+        <FilterGroup
+          legend="기간"
+          options={PERIODS}
+          value={period}
+          onChange={(v) => set("period", v as Period)}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -135,7 +150,7 @@ export default function ListTab({
             id="admin-search"
             type="search"
             value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
+            onChange={(e) => set("searchInput", e.target.value)}
             placeholder="이름·연락처·프로그램 검색"
             className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-4 text-sm text-brown placeholder:text-gray-500"
           />
@@ -146,7 +161,7 @@ export default function ListTab({
         {searchInput && (
           <button
             type="button"
-            onClick={() => setSearchInput("")}
+            onClick={() => set("searchInput", "")}
             className="min-h-[44px] whitespace-nowrap px-2 text-xs text-gray-700 underline"
           >
             검색 지우기

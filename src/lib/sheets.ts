@@ -408,9 +408,14 @@ export async function getAllRetreats(): Promise<string[][]> {
   }
 }
 
+/** 회차 전부를 0으로 채운 카운트 (회차 정의는 RETREAT_SESSIONS 하나만 본다) */
+function zeroRetreatCounts(): Record<string, number> {
+  return Object.fromEntries(RETREAT_SESSIONS.map((s) => [s.key, 0]));
+}
+
 /** 회차별 신청 인원 수 반환 { s1: 3, s2: 0, ... } */
 export async function getRetreatCounts(): Promise<Record<string, number>> {
-  const empty = { s1: 0, s2: 0, s3: 0, s4: 0, s5: 0 };
+  const empty = zeroRetreatCounts();
   if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return empty;
 
   try {
@@ -425,7 +430,7 @@ export async function getRetreatCounts(): Promise<Record<string, number>> {
     const rows = (res.data.values as string[][] | null) ?? [];
     const SESSION_COL = 5; // F열 (0-indexed)
 
-    const counts: Record<string, number> = { s1: 0, s2: 0, s3: 0, s4: 0, s5: 0 };
+    const counts = zeroRetreatCounts();
     const LABEL_TO_ID: Record<string, string> = Object.fromEntries(
       RETREAT_SESSIONS.map((s) => [s.label, s.key])
     );
