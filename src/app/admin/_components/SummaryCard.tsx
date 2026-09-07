@@ -1,5 +1,7 @@
 "use client";
 
+import { CARD, CARD_STACK, STAT_LABEL, STAT_VALUE } from "./shared";
+
 export type CardTone = "brown" | "orange" | "teal" | "gray";
 
 // 값 글자는 대비 4.5:1 이상만 쓴다(orange 계열은 흰 배경에서 3.6:1이라 제외).
@@ -18,44 +20,35 @@ const DOT_TONE: Record<CardTone, string> = {
 };
 
 /**
- * 요약 숫자 카드. 360px에서도 라벨·값이 한 줄로 유지되도록
- * 라벨은 whitespace-nowrap, 값은 nowrap + 넘치면 말줄임(줄바꿈 대신).
+ * 요약 숫자 카드. 한 줄에 놓인 카드끼리 높이가 같도록 CARD_STACK + 값에 mt-auto.
+ * 값은 nowrap이라 좁은 화면에서도 세로로 깨지지 않고, 넘치면 말줄임으로 끊는다.
  */
 export default function SummaryCard({
   label,
   value,
   tone = "brown",
   onClick,
-  active = false,
 }: {
   label: string;
   value: string;
   tone?: CardTone;
   onClick?: () => void;
-  active?: boolean;
 }) {
   const body = (
     <>
-      <p className="mb-1 flex items-center gap-1.5 whitespace-nowrap text-xs text-gray-700">
+      <p className={`${STAT_LABEL} mb-2 flex items-center gap-1.5`}>
         <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT_TONE[tone]}`} />
         {label}
       </p>
-      <p
-        className={`overflow-hidden text-ellipsis whitespace-nowrap text-lg font-medium tabular-nums ${VALUE_TONE[tone]}`}
-      >
-        {value}
-      </p>
+      <p className={`${STAT_VALUE} mt-auto ${VALUE_TONE[tone]}`}>{value}</p>
     </>
   );
 
-  const box = `min-w-0 rounded-xl border bg-white px-4 py-3 text-left ${
-    active ? "border-orange" : "border-gray-200"
-  }`;
-
+  const box = `${CARD} ${CARD_STACK} min-w-0 text-left`;
   if (!onClick) return <div className={box}>{body}</div>;
 
   return (
-    <button type="button" onClick={onClick} className={`${box} min-h-[72px] hover:border-brown`}>
+    <button type="button" onClick={onClick} className={`${box} hover:border-brown`}>
       {body}
     </button>
   );

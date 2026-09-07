@@ -7,6 +7,10 @@ import BookingDrawer from "./BookingDrawer";
 import BookingTable from "./BookingTable";
 import FilterGroup from "./FilterChips";
 import {
+  CARD_EMPTY,
+  CARD_FLUSH,
+  CARD_GRID,
+  FIELD,
   bookingStatus,
   inPeriod,
   type AdminActions,
@@ -75,7 +79,7 @@ export default function ListTab({
   }, [rows, typeFilter, statusFilter, period, search, todayISO]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="space-y-2.5">
         <FilterGroup
           legend="구분"
@@ -108,7 +112,7 @@ export default function ListTab({
             value={searchInput}
             onChange={(e) => set("searchInput", e.target.value)}
             placeholder="이름·연락처·프로그램 검색"
-            className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-4 text-sm text-brown placeholder:text-gray-500"
+            className={FIELD}
           />
         </div>
         <p aria-live="polite" className="whitespace-nowrap text-sm text-gray-700">
@@ -118,7 +122,7 @@ export default function ListTab({
           <button
             type="button"
             onClick={() => set("searchInput", "")}
-            className="min-h-[44px] whitespace-nowrap px-2 text-xs text-gray-700 underline"
+            className="h-11 whitespace-nowrap px-2 text-xs text-gray-700 underline"
           >
             검색 지우기
           </button>
@@ -128,11 +132,11 @@ export default function ListTab({
       {loading ? (
         <ul className="space-y-2" aria-busy="true">
           {[0, 1, 2].map((i) => (
-            <li key={i} className="h-24 animate-pulse rounded-xl border border-gray-200 bg-white" />
+            <li key={i} className={`${CARD_FLUSH} h-28 animate-pulse`} />
           ))}
         </ul>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center">
+        <div className={CARD_EMPTY}>
           <p className="text-sm font-medium text-brown">조건에 맞는 신청이 없어요</p>
           <p className="mt-1.5 text-xs leading-5 break-keep text-gray-700">
             필터를 &lsquo;전체&rsquo;로 되돌리거나 검색어를 지우면 전체 신청을 볼 수 있어요.
@@ -141,7 +145,7 @@ export default function ListTab({
       ) : (
         <>
           {/* md 미만: 카드 */}
-          <ul className="space-y-2 md:hidden">
+          <ul className={`${CARD_GRID} md:hidden`}>
             {filtered.map((row, i) => (
               <BookingCard key={`${row[0]}-${row[3]}-${i}`} row={row} actions={actions} />
             ))}

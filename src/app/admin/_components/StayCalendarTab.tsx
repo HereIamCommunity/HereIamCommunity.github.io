@@ -4,6 +4,12 @@ import { useState } from "react";
 import { normalizeDate } from "@/lib/digest";
 import StatusBadge from "./StatusBadge";
 import {
+  BTN_BASE,
+  BTN_OUTLINE,
+  CARD,
+  CARD_EMPTY,
+  CARD_GRID,
+  SECTION_H,
   ROOM_KEYS,
   ROOM_NAMES,
   bookingStatus,
@@ -74,7 +80,7 @@ export default function StayCalendarTab({
             type="button"
             aria-pressed={room === key}
             onClick={() => setRoom(key)}
-            className={`min-h-[44px] whitespace-nowrap rounded-lg border px-4 text-sm font-medium transition-colors ${
+            className={`${BTN_BASE} border ${
               room === key ? "border-teal bg-teal text-white" : "border-gray-300 bg-white text-gray-700 hover:border-brown"
             }`}
           >
@@ -83,25 +89,25 @@ export default function StayCalendarTab({
         ))}
       </fieldset>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className={`${CARD_GRID} lg:grid-cols-2`}>
+        <div className={CARD}>
           <div className="mb-3 flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => shiftMonth(-1)}
               aria-label="이전 달"
-              className="min-h-[44px] whitespace-nowrap rounded-lg border border-gray-300 px-3 text-sm text-gray-700 hover:border-brown"
+              className={BTN_OUTLINE}
             >
               이전
             </button>
-            <h2 className="whitespace-nowrap text-sm font-medium text-brown">
+            <h2 className={SECTION_H}>
               {year}년 {monthIndex + 1}월
             </h2>
             <button
               type="button"
               onClick={() => shiftMonth(1)}
               aria-label="다음 달"
-              className="min-h-[44px] whitespace-nowrap rounded-lg border border-gray-300 px-3 text-sm text-gray-700 hover:border-brown"
+              className={BTN_OUTLINE}
             >
               다음
             </button>
@@ -158,34 +164,40 @@ export default function StayCalendarTab({
           </ul>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 className="mb-3 whitespace-nowrap text-sm font-medium text-brown">{roomName} 다가오는 예약</h2>
+        <div className={CARD}>
+          <h2 className={`${SECTION_H} mb-3`}>{roomName} 다가오는 예약</h2>
           {upcoming.length === 0 && upcomingAirbnb.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-xs break-keep text-gray-700">
+            <p className={`${CARD_EMPTY} text-xs break-keep text-gray-700`}>
               이 방은 다가오는 예약이 없어요.
             </p>
           ) : (
             <ul className="max-h-96 space-y-2 overflow-y-auto">
               {upcoming.map((row, i) => (
-                <li key={`w-${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-teal/5 px-3 py-2.5">
-                  <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-teal" />
-                  <span className="whitespace-nowrap text-sm font-medium text-brown">{row[2]}</span>
-                  <span className="min-w-0 flex-1 whitespace-nowrap text-xs text-gray-700">
-                    {shortDate(normalizeDate(row[8]))} → {shortDate(normalizeDate(row[9]))}
-                  </span>
-                  {row[3] && (
-                    <a href={telHref(row[3])} className="whitespace-nowrap text-xs text-teal-dark underline">
-                      {row[3]}
-                    </a>
-                  )}
-                  <StatusBadge status={bookingStatus(row)} />
+                <li key={`w-${i}`} className="rounded-lg bg-teal/5 px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-teal" />
+                    <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-brown">
+                      {row[2]}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-4">
+                    <span className="whitespace-nowrap text-xs text-gray-700">
+                      {shortDate(normalizeDate(row[8]))} → {shortDate(normalizeDate(row[9]))}
+                    </span>
+                    {row[3] && (
+                      <a href={telHref(row[3])} className="whitespace-nowrap text-xs text-teal-dark underline">
+                        {row[3]}
+                      </a>
+                    )}
+                    <StatusBadge status={bookingStatus(row)} />
+                  </div>
                 </li>
               ))}
               {upcomingAirbnb.map((r, i) => (
-                <li key={`a-${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-orange/5 px-3 py-2.5">
+                <li key={`a-${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg bg-orange/5 px-3 py-2.5">
                   <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-orange" />
                   <span className="whitespace-nowrap text-sm font-medium text-brown">에어비앤비</span>
-                  <span className="min-w-0 flex-1 whitespace-nowrap text-xs text-gray-700">
+                  <span className="whitespace-nowrap text-xs text-gray-700">
                     {shortDate(normalizeDate(r.start))} → {shortDate(normalizeDate(r.end))}
                   </span>
                 </li>
@@ -195,9 +207,9 @@ export default function StayCalendarTab({
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4">
-        <h2 className="mb-3 whitespace-nowrap text-sm font-medium text-brown">전체 방 현황 (다음 30일)</h2>
-        <div className="grid grid-cols-3 gap-3">
+      <div className={CARD}>
+        <h2 className={`${SECTION_H} mb-3`}>전체 방 현황 (다음 30일)</h2>
+        <div className={`${CARD_GRID} grid-cols-3`}>
           {ROOM_KEYS.map((key) => {
             const name = ROOM_NAMES[key];
             const web = stayRows.filter(

@@ -28,7 +28,7 @@ export default function Banner({
     <div
       role={tone === "error" ? "alert" : undefined}
       aria-live={tone === "error" ? undefined : "polite"}
-      className={`rounded-xl border px-4 py-3 md:px-5 md:py-4 ${TONE[tone]}`}
+      className={`rounded-xl border p-4 md:p-5 ${TONE[tone]}`}
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1">
@@ -39,7 +39,7 @@ export default function Banner({
           <button
             type="button"
             onClick={action.onClick}
-            className="min-h-[44px] shrink-0 whitespace-nowrap rounded-lg border border-current px-4 text-sm font-medium hover:bg-white/50"
+            className="inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-current px-4 text-sm font-medium hover:bg-white/50"
           >
             {action.label}
           </button>
@@ -48,7 +48,7 @@ export default function Banner({
           <button
             type="button"
             onClick={onDismiss}
-            className="min-h-[44px] shrink-0 whitespace-nowrap px-2 text-xs underline"
+            className="inline-flex h-11 shrink-0 items-center whitespace-nowrap px-2 text-xs underline"
           >
             닫기
           </button>

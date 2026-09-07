@@ -5,7 +5,17 @@ import EntryCard from "./EntryCard";
 import RowActions from "./RowActions";
 import StatusBadge from "./StatusBadge";
 import SummaryCard from "./SummaryCard";
-import { openStayStatus, rowKey, shortDate, shortDateTime, type AdminActions, type Row } from "./shared";
+import {
+  CARD_EMPTY,
+  CARD_FLUSH,
+  CARD_GRID,
+  openStayStatus,
+  rowKey,
+  shortDate,
+  shortDateTime,
+  type AdminActions,
+  type Row,
+} from "./shared";
 
 /** 무료개방 탭 — 신청 검토 + 확정/취소/되돌리기 */
 export default function OpenStayTab({
@@ -23,7 +33,7 @@ export default function OpenStayTab({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className={`${CARD_GRID} grid-cols-2 md:grid-cols-4`}>
         <SummaryCard label="전체 신청" value={`${openStays.length}건`} />
         <SummaryCard label="확정" value={`${confirmed}건`} tone="teal" />
         <SummaryCard label="검토 중" value={`${reviewing}건`} tone="orange" />
@@ -31,20 +41,20 @@ export default function OpenStayTab({
       </div>
 
       {loading ? (
-        <ul className="grid gap-2 md:grid-cols-2" aria-busy="true">
+        <ul className={`${CARD_GRID} md:grid-cols-2`} aria-busy="true">
           {[0, 1].map((i) => (
-            <li key={i} className="h-40 animate-pulse rounded-xl border border-gray-200 bg-white" />
+            <li key={i} className={`${CARD_FLUSH} h-40 animate-pulse`} />
           ))}
         </ul>
       ) : openStays.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center">
+        <div className={CARD_EMPTY}>
           <p className="text-sm font-medium text-brown">아직 무료개방 신청이 없어요</p>
           <p className="mt-1.5 text-xs leading-5 break-keep text-gray-700">
             신청이 들어오면 여기에서 바로 확정하거나 취소할 수 있어요.
           </p>
         </div>
       ) : (
-        <ul className="grid gap-2 md:grid-cols-2">
+        <ul className={`${CARD_GRID} md:grid-cols-2`}>
           {openStays.map((row, i) => {
             const status = openStayStatus(row);
             return (

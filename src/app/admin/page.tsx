@@ -7,6 +7,8 @@ import Banner from "./_components/Banner";
 import { useAdminApi } from "./_components/useAdminApi";
 import {
   BTN_PRIMARY,
+  CARD,
+  FIELD,
   rowKey,
   type AdminActions,
   type DateRange,
@@ -234,7 +236,7 @@ export default function AdminPage() {
   if (!authed) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center px-4 py-12">
-        <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-8">
+        <div className={`${CARD} w-full max-w-sm`}>
           <h1 className="mb-1 whitespace-nowrap text-xl font-light text-brown">코이노니아 어드민</h1>
           <p className="mb-6 text-xs text-gray-700">운영자 전용 화면이에요.</p>
 
@@ -256,7 +258,7 @@ export default function AdminPage() {
                 value={pwInput}
                 onChange={(e) => setPwInput(e.target.value)}
                 required
-                className="min-h-[44px] w-full rounded-lg border border-gray-300 px-4 text-sm text-brown"
+                className={FIELD}
               />
             </div>
             {loginError && (

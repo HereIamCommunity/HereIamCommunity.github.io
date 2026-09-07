@@ -143,16 +143,47 @@ export function inPeriod(createdAt: string, period: Period, todayISO: string): b
   return iso.slice(0, 7) === todayISO.slice(0, 7);
 }
 
-/* ── 버튼 클래스 (최소 44px 타깃 · 라벨은 항상 한 줄) ── */
+/* ── 버튼 클래스 (높이 2종만: 44px / 36px · 라벨은 항상 한 줄) ── */
 export const BTN_BASE =
-  "inline-flex items-center justify-center min-h-[44px] px-4 rounded-lg text-sm font-medium whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+  "inline-flex items-center justify-center h-11 px-4 rounded-lg text-sm font-medium whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
 export const BTN_PRIMARY = `${BTN_BASE} bg-brown text-white hover:bg-brown/85`;
 export const BTN_CONFIRM = `${BTN_BASE} bg-teal text-white hover:bg-teal-dark`;
 export const BTN_OUTLINE = `${BTN_BASE} border border-gray-300 text-gray-700 hover:border-brown hover:text-brown bg-white`;
 export const BTN_DANGER = `${BTN_BASE} border border-orange-dark bg-orange/10 text-brown hover:bg-orange/20`;
-/** 표 안에서만 쓰는 작은 버튼 — 그래도 세로 타깃 36px + nowrap */
+/** 표·카드 안의 작은 버튼 — 칩과 같은 36px */
 export const BTN_SMALL =
-  "inline-flex items-center justify-center min-h-[36px] px-3 rounded-md text-xs font-medium whitespace-nowrap transition-colors disabled:opacity-40 border bg-white";
+  "inline-flex items-center justify-center h-9 px-3 rounded-md text-xs font-medium whitespace-nowrap transition-colors disabled:opacity-40 border bg-white";
+/** 입력 요소도 버튼과 같은 44px */
+export const FIELD =
+  "h-11 w-full rounded-lg border border-gray-300 bg-white px-4 text-sm text-brown placeholder:text-gray-500";
+
+/* ── 카드·간격·타이포 (박스 크기 통일) ────────────────────
+   흰 카드 표면은 이 3종만 쓴다. 새 카드를 만들 땐 여기서 골라 쓰고
+   패딩·라운드·테두리를 따로 적지 않는다. */
+/** 기본 카드 — 안쪽 콘텐츠가 패딩을 갖지 않는 경우 */
+export const CARD = "rounded-xl border border-gray-200 bg-white p-4 md:p-5";
+/** 표·행 리스트처럼 자식이 자기 패딩을 갖는 카드 (바깥 패딩 없음) */
+export const CARD_FLUSH = "rounded-xl border border-gray-200 bg-white";
+/** 빈 상태 카드 */
+export const CARD_EMPTY =
+  "rounded-xl border border-dashed border-gray-300 bg-white p-6 md:p-8 text-center";
+/** 같은 줄 카드의 높이를 맞춘다 (그리드는 CARD_GRID, 카드는 이 클래스) */
+export const CARD_STACK = "flex h-full flex-col";
+/** 카드 그리드 — 열 수는 쓰는 쪽에서 붙인다 */
+export const CARD_GRID = "grid items-stretch gap-3 md:gap-4";
+
+/** 카드의 큰 숫자 — 넘치면 줄바꿈 대신 말줄임 */
+export const STAT_VALUE =
+  "overflow-hidden text-ellipsis whitespace-nowrap text-2xl md:text-3xl font-light tabular-nums";
+/** 카드의 작은 라벨 (항상 값보다 위) */
+export const STAT_LABEL = "whitespace-nowrap text-xs tracking-wide text-gray-500";
+/** 섹션 제목 / 그 오른쪽의 건수 */
+export const SECTION_H = "whitespace-nowrap text-sm font-medium text-brown";
+export const SECTION_COUNT = "whitespace-nowrap text-xs text-gray-500";
+
+/** 표 헤더·셀 패딩 (BookingTable · BucketTable 공통) */
+export const TH_CELL = "whitespace-nowrap px-4 py-3 text-xs font-medium text-gray-700";
+export const TD_CELL = "whitespace-nowrap px-4 py-3";
 
 /* ── 스테이 캘린더 계산 (문자열 비교 전에 normalizeDate로 통일) ── */
 export type DateRange = { start: string; end: string };

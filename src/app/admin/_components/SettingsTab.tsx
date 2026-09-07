@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Banner from "./Banner";
-import { BTN_DANGER, BTN_OUTLINE } from "./shared";
+import { BTN_DANGER, BTN_OUTLINE, CARD_FLUSH, SECTION_H } from "./shared";
 
 export type NotifyEnv = {
   ok: boolean;
@@ -25,7 +25,7 @@ function CheckLine({ label, missing }: { label: string; missing: string[] }) {
         />
         {label}
       </span>
-      <span className={`min-w-0 flex-1 break-keep text-sm ${good ? "text-teal-dark" : "text-brown"}`}>
+      <span className={`min-w-0 flex-1 [overflow-wrap:anywhere] text-sm ${good ? "text-teal-dark" : "text-brown"}`}>
         {good ? "전부 설정됨" : `${missing.length}개 미설정 · ${missing.join(", ")}`}
       </span>
     </li>
@@ -89,7 +89,7 @@ export default function SettingsTab({ apiFetch }: { apiFetch: ApiFetch }) {
     <div className="max-w-2xl space-y-6">
       <section aria-labelledby="settings-env-h" className="space-y-2">
         <div className="flex items-center justify-between gap-3">
-          <h2 id="settings-env-h" className="whitespace-nowrap text-sm font-medium text-brown">
+          <h2 id="settings-env-h" className={SECTION_H}>
             알림 설정 상태
           </h2>
           <button type="button" onClick={check} disabled={checking} className={BTN_OUTLINE}>
@@ -101,7 +101,7 @@ export default function SettingsTab({ apiFetch }: { apiFetch: ApiFetch }) {
 
         {env && (
           <>
-            <ul className="rounded-xl border border-gray-200 bg-white px-4">
+            <ul className={`${CARD_FLUSH} px-4`}>
               <CheckLine label="필수 항목" missing={env.missingRequired} />
               <CheckLine label="알림톡 템플릿" missing={env.missingKakao} />
             </ul>
@@ -114,12 +114,12 @@ export default function SettingsTab({ apiFetch }: { apiFetch: ApiFetch }) {
         )}
 
         {!env && !envError && (
-          <div className="h-24 animate-pulse rounded-xl border border-gray-200 bg-white" aria-busy="true" />
+          <div className={`${CARD_FLUSH} h-28 animate-pulse`} aria-busy="true" />
         )}
       </section>
 
       <section aria-labelledby="settings-test-h" className="space-y-2">
-        <h2 id="settings-test-h" className="whitespace-nowrap text-sm font-medium text-brown">
+        <h2 id="settings-test-h" className={SECTION_H}>
           테스트 문자 보내기
         </h2>
         <p className="text-xs leading-5 break-keep text-gray-700">
@@ -128,7 +128,7 @@ export default function SettingsTab({ apiFetch }: { apiFetch: ApiFetch }) {
         </p>
 
         {asking ? (
-          <div className="rounded-xl border border-orange/40 bg-orange/10 p-4">
+          <div className="rounded-xl border border-orange/40 bg-orange/10 p-4 md:p-5">
             <p className="text-sm break-keep text-brown">
               지금 {env?.operatorPhoneMasked ?? "호스트 번호"}로 테스트 문자를 1건 보낼까요?
             </p>

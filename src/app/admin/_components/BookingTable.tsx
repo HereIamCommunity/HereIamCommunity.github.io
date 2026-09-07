@@ -3,6 +3,9 @@
 import RowActions from "./RowActions";
 import StatusBadge, { TypeBadge } from "./StatusBadge";
 import {
+  CARD_FLUSH,
+  TD_CELL,
+  TH_CELL,
   amountText,
   bookingStatus,
   contentOf,
@@ -28,7 +31,7 @@ export default function BookingTable({
   onSelect: (row: Row) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+    <div className={`${CARD_FLUSH} overflow-x-auto`}>
       <table className="w-full min-w-[880px] text-sm">
         <caption className="sr-only">예약 목록 — 이름을 누르면 상세 정보가 열립니다.</caption>
         <thead>
@@ -37,9 +40,7 @@ export default function BookingTable({
               <th
                 key={h}
                 scope="col"
-                className={`whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-gray-700 ${
-                  h === "이름" ? "sticky left-0 z-10 bg-cream" : ""
-                }`}
+                className={`${TH_CELL} text-left ${h === "이름" ? "sticky left-0 z-10 bg-cream" : ""}`}
               >
                 {h}
               </th>
@@ -51,7 +52,7 @@ export default function BookingTable({
             const status = bookingStatus(row);
             return (
               <tr key={`${rowKey("booking", row)}-${i}`} className="border-b border-gray-100 last:border-0">
-                <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-4 py-3">
+                <td className={`${TD_CELL} sticky left-0 z-10 bg-white`}>
                   <button
                     type="button"
                     onClick={() => onSelect(row)}
@@ -61,20 +62,20 @@ export default function BookingTable({
                     {row[2] || "이름 없음"}
                   </button>
                 </td>
-                <td className="whitespace-nowrap px-4 py-3">
+                <td className={TD_CELL}>
                   <TypeBadge type={row[1]} />
                 </td>
-                <td className="max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap px-4 py-3 text-brown">
+                <td className={`${TD_CELL} max-w-[220px] overflow-hidden text-ellipsis text-brown`}>
                   {contentOf(row)}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-gray-700">{whenOf(row)}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-brown">
+                <td className={`${TD_CELL} text-gray-700`}>{whenOf(row)}</td>
+                <td className={`${TD_CELL} text-right tabular-nums text-brown`}>
                   {amountText(row[11])}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3">
+                <td className={TD_CELL}>
                   <StatusBadge status={status} />
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 align-top">
+                <td className={`${TD_CELL} align-top`}>
                   <RowActions sheet="booking" row={row} status={status} actions={actions} size="sm" />
                 </td>
               </tr>

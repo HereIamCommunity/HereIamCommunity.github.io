@@ -3,6 +3,18 @@
 import { useState } from "react";
 import type { Bucket, Comparison, Stats } from "@/lib/stats";
 import FilterGroup from "./FilterChips";
+import {
+  CARD,
+  CARD_EMPTY,
+  CARD_FLUSH,
+  CARD_GRID,
+  CARD_STACK,
+  SECTION_H,
+  STAT_LABEL,
+  STAT_VALUE,
+  TD_CELL,
+  TH_CELL,
+} from "./shared";
 
 /* ────────────────────────────────────────────────────────────
    색 (dataviz 스킬 · 카테고리 색은 고정 순서, 순환 금지)
@@ -30,6 +42,8 @@ type Metric = (typeof METRICS)[number];
 type Scope = (typeof SCOPES)[number];
 
 const PLOT_H = 160;
+/** x축 라벨 줄 높이 — 기준선 위치 계산에도 같이 쓴다 */
+const X_LABEL_H = 22;
 
 /** 축·직접 라벨용 짧은 표기. 금액은 만원 단위로 접는다. */
 function short(n: number, metric: Metric): string {
@@ -62,24 +76,26 @@ function CompareCard({ c }: { c: Comparison }) {
   const unit = c.unit;
 
   return (
-    <div className="min-w-0 rounded-xl border border-gray-200 bg-white px-4 py-3">
-      <p className="mb-1 whitespace-nowrap text-xs text-gray-600">{c.label}</p>
-      <p className="overflow-hidden text-ellipsis whitespace-nowrap text-lg font-medium tabular-nums text-brown">
-        {c.current.toLocaleString()}
-        {unit}
-      </p>
-      <p className={`mt-0.5 whitespace-nowrap text-xs tabular-nums ${tone}`}>
-        <span aria-hidden="true">{arrow} </span>
-        {sign}
-        {c.diff.toLocaleString()}
-        {unit}
-        {c.pct !== null && ` (${sign}${c.pct}%)`}
-        <span className="sr-only"> {word}</span>
-      </p>
-      <p className="mt-0.5 whitespace-nowrap text-xs text-gray-600 tabular-nums">
-        이전 {c.previous.toLocaleString()}
-        {unit}
-      </p>
+    <div className={`${CARD} ${CARD_STACK} min-w-0`}>
+      <p className={`${STAT_LABEL} mb-2`}>{c.label}</p>
+      <div className="mt-auto">
+        <p className={`${STAT_VALUE} text-brown`}>
+          {c.current.toLocaleString()}
+          {unit}
+        </p>
+        <p className={`mt-1 whitespace-nowrap text-xs tabular-nums ${tone}`}>
+          <span aria-hidden="true">{arrow} </span>
+          {sign}
+          {c.diff.toLocaleString()}
+          {unit}
+          {c.pct !== null && ` (${sign}${c.pct}%)`}
+          <span className="sr-only"> {word}</span>
+        </p>
+        <p className="mt-0.5 whitespace-nowrap text-xs tabular-nums text-gray-500">
+          이전 {c.previous.toLocaleString()}
+          {unit}
+        </p>
+      </div>
     </div>
   );
 }
@@ -104,6 +120,10 @@ function BarChart({
   const maxIdx = buckets.reduce((best, b, i) => (totalOf(b) > totalOf(buckets[best]) ? i : best), 0);
   // 일별 30개는 라벨이 겹치므로 격일만 남긴다 (막대는 전부 그린다)
   const labelEvery = period === "일별" ? 2 : 1;
+  // 라벨이 서로 겹치지 않을 만큼 칸 최소 폭을 잡는다.
+  // 일별 "9/7"(약 20px)은 격일이라 16px면 충분하고, 월별 "2025년 10월"·연도별 "2026년"은 64px 필요.
+  // 좁은 화면에서는 이 최소 폭 때문에 그래프 컨테이너 안에서만 가로로 밀린다.
+  const minCol = period === "일별" ? 16 : 64;
 
   return (
     <div>
@@ -119,9 +139,9 @@ function BarChart({
 
       {/* pt-10: 툴팁이 스크롤 컨테이너 위쪽에서 잘리지 않게 확보한 여백 */}
       <div className="overflow-x-auto pt-10">
-        <div className="relative flex min-w-full items-end gap-1" style={{ paddingBottom: 22 }}>
-          {/* 눈에 띄지 않는 기준선 (0 / 50 / 100%) */}
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0" style={{ bottom: 22 }}>
+        <div className="relative flex min-w-full items-end gap-1">
+          {/* 눈에 띄지 않는 기준선 (0 / 50 / 100%) — 막대 바닥선에 맞춘다 */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0" style={{ bottom: X_LABEL_H }}>
             <div className="border-t border-gray-200" style={{ marginBottom: PLOT_H / 2 }} />
             <div className="border-t border-gray-100" style={{ marginBottom: PLOT_H / 2 }} />
             <div className="border-t border-gray-300" />
@@ -145,7 +165,11 @@ function BarChart({
             const showValue = i === maxIdx || i === buckets.length - 1;
 
             return (
-              <div key={b.key} className="group relative flex min-w-[16px] flex-1 flex-col items-center">
+              <div
+                key={b.key}
+                className="group relative flex flex-1 flex-col items-center"
+                style={{ minWidth: minCol }}
+              >
                 <span className="mb-1 h-4 whitespace-nowrap text-[10px] leading-4 text-gray-700 tabular-nums">
                   {showValue && total > 0 ? short(total, metric) : ""}
                 </span>
@@ -172,7 +196,10 @@ function BarChart({
                   {total === 0 && <div aria-hidden="true" className="h-[2px] w-full bg-gray-200" />}
                 </div>
 
-                <span className="absolute inset-x-0 bottom-0 whitespace-nowrap text-center text-[10px] leading-[22px] text-gray-600 tabular-nums">
+                <span
+                  className="w-full whitespace-nowrap text-center text-[10px] text-gray-600 tabular-nums"
+                  style={{ height: X_LABEL_H, lineHeight: `${X_LABEL_H}px` }}
+                >
                   {i % labelEvery === 0 ? b.label : ""}
                 </span>
 
@@ -198,28 +225,28 @@ function BucketTable({ buckets, metric, scope }: { buckets: Bucket[]; metric: Me
   const showSalon = scope !== "스테이";
   const showStay = scope !== "살롱";
   return (
-    <div className="max-h-96 overflow-auto rounded-xl border border-gray-200 bg-white">
+    <div className={`${CARD_FLUSH} max-h-96 overflow-auto`}>
       <table className="w-full text-sm">
         <caption className="sr-only">그래프와 같은 데이터의 표</caption>
         <thead className="sticky top-0 bg-cream/90">
           <tr className="border-b border-gray-200">
-            <th scope="col" className="whitespace-nowrap px-4 py-2.5 text-left text-xs font-medium text-gray-700">
+            <th scope="col" className={`${TH_CELL} text-left`}>
               기간
             </th>
             {showSalon && (
-              <th scope="col" className="whitespace-nowrap px-4 py-2.5 text-right text-xs font-medium text-gray-700">
+              <th scope="col" className={`${TH_CELL} text-right`}>
                 살롱
               </th>
             )}
             {showStay && (
-              <th scope="col" className="whitespace-nowrap px-4 py-2.5 text-right text-xs font-medium text-gray-700">
+              <th scope="col" className={`${TH_CELL} text-right`}>
                 스테이
               </th>
             )}
-            <th scope="col" className="whitespace-nowrap px-4 py-2.5 text-right text-xs font-medium text-gray-700">
+            <th scope="col" className={`${TH_CELL} text-right`}>
               합계
             </th>
-            <th scope="col" className="whitespace-nowrap px-4 py-2.5 text-right text-xs font-medium text-gray-500">
+            <th scope="col" className={`${TH_CELL} text-right`}>
               신청
             </th>
           </tr>
@@ -230,23 +257,23 @@ function BucketTable({ buckets, metric, scope }: { buckets: Bucket[]; metric: Me
             const stay = showStay ? stayOf(b, metric) : 0;
             return (
               <tr key={b.key} className="border-b border-gray-100 last:border-0">
-                <th scope="row" className="whitespace-nowrap px-4 py-2 text-left font-normal text-brown">
+                <th scope="row" className={`${TD_CELL} text-left font-normal text-brown`}>
                   {b.label}
                 </th>
                 {showSalon && (
-                  <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-gray-700">
+                  <td className={`${TD_CELL} text-right tabular-nums text-gray-700`}>
                     {salon.toLocaleString()}
                   </td>
                 )}
                 {showStay && (
-                  <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-gray-700">
+                  <td className={`${TD_CELL} text-right tabular-nums text-gray-700`}>
                     {stay.toLocaleString()}
                   </td>
                 )}
-                <td className="whitespace-nowrap px-4 py-2 text-right font-medium tabular-nums text-brown">
+                <td className={`${TD_CELL} text-right font-medium tabular-nums text-brown`}>
                   {(salon + stay).toLocaleString()}
                 </td>
-                <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-gray-500">
+                <td className={`${TD_CELL} text-right tabular-nums text-gray-500`}>
                   {b.requested.toLocaleString()}건
                 </td>
               </tr>
@@ -283,9 +310,9 @@ function RankRow({ name, value, note, max, fill }: { name: string; value: string
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
-      <h3 className="mb-2 whitespace-nowrap text-sm font-medium text-brown">{title}</h3>
-      {children}
+    <section className={`${CARD} ${CARD_STACK}`}>
+      <h3 className={`${SECTION_H} mb-2`}>{title}</h3>
+      <div className="mt-auto">{children}</div>
     </section>
   );
 }
@@ -321,15 +348,15 @@ export default function StatsTab({ stats, loading }: { stats: Stats; loading: bo
   if (loading) {
     return (
       <div className="space-y-4" aria-busy="true">
-        <div className="h-24 animate-pulse rounded-xl border border-gray-200 bg-white" />
-        <div className="h-64 animate-pulse rounded-xl border border-gray-200 bg-white" />
+        <div className={`${CARD_FLUSH} h-28 animate-pulse`} />
+        <div className={`${CARD_FLUSH} h-64 animate-pulse`} />
       </div>
     );
   }
 
   if (!hasData) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center">
+      <div className={CARD_EMPTY}>
         <p className="text-sm font-medium text-brown">아직 집계할 데이터가 없어요</p>
         <p className="mx-auto mt-1.5 max-w-md text-xs leading-5 break-keep text-gray-700">{basisText}</p>
       </div>
@@ -345,10 +372,10 @@ export default function StatsTab({ stats, loading }: { stats: Stats; loading: bo
       </div>
 
       <section aria-labelledby="stats-compare-h" className="space-y-2">
-        <h2 id="stats-compare-h" className="whitespace-nowrap text-sm font-medium text-brown">
+        <h2 id="stats-compare-h" className={SECTION_H}>
           비교
         </h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className={`${CARD_GRID} grid-cols-1 sm:grid-cols-3`}>
           {compare.map((c) => (
             <CompareCard key={c.label} c={c} />
           ))}
@@ -356,16 +383,16 @@ export default function StatsTab({ stats, loading }: { stats: Stats; loading: bo
       </section>
 
       <section aria-labelledby="stats-chart-h" className="space-y-2">
-        <h2 id="stats-chart-h" className="whitespace-nowrap text-sm font-medium text-brown">
+        <h2 id="stats-chart-h" className={SECTION_H}>
           {period} 추이 · {metric}
         </h2>
-        <div className="rounded-xl border border-gray-200 bg-white p-4">
+        <div className={CARD}>
           <BarChart buckets={buckets} metric={metric} scope={scope} period={period} />
         </div>
         <BucketTable buckets={buckets} metric={metric} scope={scope} />
       </section>
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className={`${CARD_GRID} lg:grid-cols-3`}>
         <Panel title="살롱 프로그램별 확정 (상위 10)">
           {stats.byProgram.length === 0 ? (
             <EmptyLine text="확정된 살롱 신청이 아직 없어요." />

@@ -5,7 +5,17 @@ import EntryCard from "./EntryCard";
 import RowActions from "./RowActions";
 import StatusBadge from "./StatusBadge";
 import SummaryCard from "./SummaryCard";
-import { retreatStatus, rowKey, shortDateTime, type AdminActions, type Row } from "./shared";
+import {
+  CARD_EMPTY,
+  CARD_FLUSH,
+  CARD_GRID,
+  SECTION_H,
+  retreatStatus,
+  rowKey,
+  shortDateTime,
+  type AdminActions,
+  type Row,
+} from "./shared";
 
 /** 리트릿 탭 — 회차별 인원(취소 제외) + 신청 목록 + 상태 처리 */
 export default function RetreatTab({
@@ -22,10 +32,10 @@ export default function RetreatTab({
   return (
     <div className="space-y-6">
       <section aria-labelledby="retreat-counts-h" className="space-y-2">
-        <h2 id="retreat-counts-h" className="whitespace-nowrap text-sm font-medium text-brown">
+        <h2 id="retreat-counts-h" className={SECTION_H}>
           회차별 인원 (취소 제외)
         </h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <div className={`${CARD_GRID} grid-cols-2 md:grid-cols-5`}>
           {RETREAT_SESSIONS.map((s) => {
             const n = counts[s.key] ?? counts[s.label] ?? 0;
             return (
@@ -41,20 +51,20 @@ export default function RetreatTab({
       </section>
 
       {loading ? (
-        <ul className="grid gap-2 md:grid-cols-2" aria-busy="true">
+        <ul className={`${CARD_GRID} md:grid-cols-2`} aria-busy="true">
           {[0, 1].map((i) => (
-            <li key={i} className="h-40 animate-pulse rounded-xl border border-gray-200 bg-white" />
+            <li key={i} className={`${CARD_FLUSH} h-40 animate-pulse`} />
           ))}
         </ul>
       ) : retreats.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center">
+        <div className={CARD_EMPTY}>
           <p className="text-sm font-medium text-brown">아직 리트릿 신청이 없어요</p>
           <p className="mt-1.5 text-xs leading-5 break-keep text-gray-700">
             신청이 들어오면 여기에서 회차별 인원과 함께 확인할 수 있어요.
           </p>
         </div>
       ) : (
-        <ul className="grid gap-2 md:grid-cols-2">
+        <ul className={`${CARD_GRID} md:grid-cols-2`}>
           {retreats.map((row, i) => {
             const status = retreatStatus(row);
             return (

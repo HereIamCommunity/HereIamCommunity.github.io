@@ -7,7 +7,7 @@ export function Chip({ label, active, onClick }: { label: string; active: boolea
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`min-h-[36px] whitespace-nowrap rounded-full border px-3.5 text-xs font-medium transition-colors ${
+      className={`h-9 whitespace-nowrap rounded-full border px-3.5 text-xs font-medium transition-colors ${
         active ? "border-brown bg-brown text-white" : "border-gray-300 bg-white text-gray-700 hover:border-brown"
       }`}
     >

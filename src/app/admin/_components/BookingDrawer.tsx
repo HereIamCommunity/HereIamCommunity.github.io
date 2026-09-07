@@ -5,6 +5,7 @@ import NotifyStatus from "./NotifyStatus";
 import RowActions from "./RowActions";
 import StatusBadge, { TypeBadge } from "./StatusBadge";
 import {
+  BTN_OUTLINE,
   amountText,
   bookingStatus,
   contentOf,
@@ -72,7 +73,7 @@ export default function BookingDrawer({
             ref={closeRef}
             type="button"
             onClick={onClose}
-            className="min-h-[44px] shrink-0 whitespace-nowrap rounded-lg border border-gray-300 px-4 text-sm text-gray-700 hover:border-brown"
+            className={`${BTN_OUTLINE} shrink-0`}
           >
             닫기
           </button>

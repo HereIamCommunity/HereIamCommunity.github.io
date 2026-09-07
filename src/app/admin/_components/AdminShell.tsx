@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Digest } from "@/lib/digest";
 import { buildStats } from "@/lib/stats";
 import Banner from "./Banner";
@@ -14,6 +14,7 @@ import TodayTab from "./TodayTab";
 import type { ApiResult } from "./useAdminApi";
 import {
   amountText,
+  BTN_OUTLINE,
   findConflicts,
   type AdminActions,
   type DateRange,
@@ -33,6 +34,10 @@ export const TABS = [
   { key: "settings", label: "설정" },
 ] as const;
 export type TabKey = (typeof TABS)[number]["key"];
+
+function isTabKey(v: string | null): v is TabKey {
+  return !!v && TABS.some((t) => t.key === v);
+}
 
 const DEFAULT_FILTERS: ListFilters = {
   period: "전체",
@@ -83,7 +88,39 @@ export default function AdminShell({
   onLogout: () => void;
   topSlot?: React.ReactNode;
 }) {
-  const [tab, setTab] = useState<TabKey>("today");
+  const [tab, setTabState] = useState<TabKey>("today");
+
+  // ?tab=stats 딥링크. 정적 프리렌더 HTML은 항상 "today"라 하이드레이션 이후에만 반영한다.
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      await Promise.resolve();
+      if (!alive) return;
+      const q = new URLSearchParams(window.location.search).get("tab");
+      if (isTabKey(q)) setTabState(q);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // 좁은 화면에서 탭 스트립이 가로로 밀릴 때, 선택된 탭이 화면 밖이면 보이게 당긴다.
+  const tabRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    tabRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [tab]);
+
+  /** 탭을 바꾸면 주소도 같이 갱신한다 (새로고침·공유해도 같은 탭) */
+  const setTab = (next: TabKey) => {
+    setTabState(next);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("tab", next);
+      window.history.replaceState(null, "", url);
+    } catch {
+      /* 주소 갱신에 실패해도 화면 전환에는 영향이 없다 */
+    }
+  };
   // 목록 탭 필터는 여기서 들고 있는다 — 탭을 왕복해도 필터·검색어가 살아 있어야 한다.
   const [listFilters, setListFilters] = useState<ListFilters>(DEFAULT_FILTERS);
 
@@ -102,7 +139,7 @@ export default function AdminShell({
   const conflicts = findConflicts(stayRows, airbnbRanges, digest.today);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 md:px-6 md:py-8">
+    <div className="mx-auto w-full max-w-7xl overflow-x-clip px-4 py-6 md:px-6 md:py-8">
       {topSlot}
 
       <header className="mb-5">
@@ -118,14 +155,14 @@ export default function AdminShell({
               type="button"
               onClick={onRefresh}
               disabled={loading}
-              className="min-h-[44px] whitespace-nowrap rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-700 hover:border-brown disabled:opacity-40"
+              className={BTN_OUTLINE}
             >
               {loading ? "불러오는 중…" : "새로고침"}
             </button>
             <button
               type="button"
               onClick={onLogout}
-              className="min-h-[44px] whitespace-nowrap rounded-lg border border-gray-300 bg-white px-4 text-sm text-gray-700 hover:border-brown"
+              className={BTN_OUTLINE}
             >
               로그아웃
             </button>
@@ -175,10 +212,11 @@ export default function AdminShell({
       )}
 
       <div className="mb-5 -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
-        <div role="tablist" aria-label="어드민 화면" className="flex w-max gap-1 border-b border-gray-200">
+        <div role="tablist" aria-label="어드민 화면" className="flex w-max gap-5 border-b border-gray-200">
           {TABS.map((t) => (
             <button
               key={t.key}
+              ref={tab === t.key ? tabRef : undefined}
               type="button"
               role="tab"
               id={`tab-${t.key}`}
@@ -186,7 +224,7 @@ export default function AdminShell({
               // 활성 패널만 렌더하므로 선택된 탭에서만 aria-controls를 건다(빈 IDREF 방지)
               aria-controls={tab === t.key ? `panel-${t.key}` : undefined}
               onClick={() => setTab(t.key)}
-              className={`-mb-px min-h-[44px] whitespace-nowrap border-b-2 px-4 text-sm font-medium transition-colors ${
+              className={`-mb-px h-11 whitespace-nowrap border-b-2 text-sm font-medium transition-colors ${
                 tab === t.key
                   ? "border-orange font-semibold text-brown"
                   : "border-transparent text-gray-600 hover:text-brown"

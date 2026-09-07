@@ -6,6 +6,11 @@ import BookingCard from "./BookingCard";
 import StatusBadge from "./StatusBadge";
 import SummaryCard from "./SummaryCard";
 import {
+  CARD_EMPTY,
+  CARD_FLUSH,
+  CARD_GRID,
+  SECTION_COUNT,
+  SECTION_H,
   bookingStatus,
   contentOf,
   shortDate,
@@ -16,19 +21,29 @@ import {
   type Row,
 } from "./shared";
 
-/** 오늘 탭의 읽기 전용 한 줄 — 라벨/값은 가로 배치, 값만 break-keep */
+/**
+ * 오늘 탭의 읽기 전용 행.
+ * 이름·내용·일시·연락처·배지를 한 줄에 두면 390px에서 문서 폭이 넘쳐 화면이 잘린다.
+ * 그래서 항상 2줄로 나눈다 — 1줄은 이름 + 내용(넘치면 말줄임), 2줄은 나머지를 flex-wrap.
+ */
 function MiniRow({ row, trailing }: { row: Row; trailing?: string }) {
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-gray-100 px-4 py-3 last:border-0">
-      <span className="whitespace-nowrap text-sm font-medium text-brown">{row[2] || "이름 없음"}</span>
-      <span className="min-w-0 flex-1 break-keep text-sm text-gray-700">{contentOf(row)}</span>
-      <span className="whitespace-nowrap text-xs text-gray-700">{trailing ?? whenOf(row)}</span>
-      {row[3] && (
-        <a href={telHref(row[3])} className="whitespace-nowrap text-xs text-teal-dark underline">
-          {row[3]}
-        </a>
-      )}
-      <StatusBadge status={bookingStatus(row)} />
+    <li className="border-b border-gray-100 px-4 py-3 last:border-0">
+      <div className="flex items-baseline gap-3">
+        <span className="whitespace-nowrap text-sm font-medium text-brown">{row[2] || "이름 없음"}</span>
+        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-gray-700">
+          {contentOf(row)}
+        </span>
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className="whitespace-nowrap text-xs text-gray-700">{trailing ?? whenOf(row)}</span>
+        {row[3] && (
+          <a href={telHref(row[3])} className="whitespace-nowrap text-xs text-teal-dark underline">
+            {row[3]}
+          </a>
+        )}
+        <StatusBadge status={bookingStatus(row)} />
+      </div>
     </li>
   );
 }
@@ -49,13 +64,13 @@ function Section({
   return (
     <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-24">
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <h2 id={`${id}-h`} className="whitespace-nowrap text-sm font-medium text-brown">
+        <h2 id={`${id}-h`} className={SECTION_H}>
           {title}
         </h2>
-        <span className="whitespace-nowrap text-xs text-gray-700">{count}건</span>
+        <span className={SECTION_COUNT}>{count}건</span>
       </div>
       {count === 0 ? (
-        <p className="rounded-xl border border-dashed border-gray-300 bg-white px-4 py-6 text-center text-xs break-keep text-gray-700">
+        <p className={`${CARD_EMPTY} text-xs break-keep text-gray-700`}>
           {empty}
         </p>
       ) : (
@@ -117,7 +132,7 @@ export default function TodayTab({
         />
       )}
 
-      <div id="today-top" className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div id="today-top" className={`${CARD_GRID} grid-cols-2 md:grid-cols-4`}>
         <SummaryCard
           label="입금대기"
           value={`${pending.length}건`}
@@ -150,7 +165,7 @@ export default function TodayTab({
         count={pending.length}
         empty="입금대기 건이 없어요."
       >
-        <ul className="grid gap-2 md:grid-cols-2">
+        <ul className={`${CARD_GRID} md:grid-cols-2`}>
           {pending.map((row, i) => (
             <BookingCard key={`p-${row[0]}-${row[3]}-${i}`} row={row} actions={actions} />
           ))}
@@ -158,7 +173,7 @@ export default function TodayTab({
       </Section>
 
       <Section id="today-checkin" title="오늘 체크인" count={digest.checkIns.length} empty="오늘 들어오는 손님이 없어요.">
-        <ul className="rounded-xl border border-gray-200 bg-white">
+        <ul className={CARD_FLUSH}>
           {digest.checkIns.map((row, i) => (
             <MiniRow key={`ci-${i}`} row={row} trailing={`${shortDate(row[8])} → ${shortDate(row[9])}`} />
           ))}
@@ -171,7 +186,7 @@ export default function TodayTab({
         count={digest.checkOuts.length}
         empty="오늘 나가는 손님이 없어요."
       >
-        <ul className="rounded-xl border border-gray-200 bg-white">
+        <ul className={CARD_FLUSH}>
           {digest.checkOuts.map((row, i) => (
             <MiniRow key={`co-${i}`} row={row} trailing={`${shortDate(row[8])} → ${shortDate(row[9])}`} />
           ))}
@@ -179,7 +194,7 @@ export default function TodayTab({
       </Section>
 
       <Section id="today-salon" title="오늘 살롱" count={digest.salonToday.length} empty="오늘 진행하는 살롱이 없어요.">
-        <ul className="rounded-xl border border-gray-200 bg-white">
+        <ul className={CARD_FLUSH}>
           {digest.salonToday.map((row, i) => (
             <MiniRow key={`s-${i}`} row={row} />
           ))}
@@ -192,7 +207,7 @@ export default function TodayTab({
         count={digest.newYesterday.length}
         empty="어제 들어온 새 신청이 없어요."
       >
-        <ul className="rounded-xl border border-gray-200 bg-white">
+        <ul className={CARD_FLUSH}>
           {digest.newYesterday.map((row, i) => (
             <MiniRow key={`n-${i}`} row={row} trailing={shortDateTime(row[0])} />
           ))}

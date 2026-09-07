@@ -6,6 +6,8 @@ import RowActions from "./RowActions";
 import StatusBadge, { TypeBadge } from "./StatusBadge";
 import {
   BTN_OUTLINE,
+  CARD,
+  CARD_STACK,
   amountText,
   bookingStatus,
   contentOf,
@@ -35,7 +37,7 @@ export default function BookingCard({ row, actions }: { row: Row; actions: Admin
   const msg = actions.rowMsg[key];
 
   return (
-    <li className="rounded-xl border border-gray-200 bg-white p-4">
+    <li className={`${CARD} ${CARD_STACK}`}>
       <div className="mb-3 flex items-start gap-2">
         <p className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-base font-medium text-brown">
           {row[2] || "이름 없음"}
@@ -68,7 +70,7 @@ export default function BookingCard({ row, actions }: { row: Row; actions: Admin
         </Field>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-auto flex items-center gap-2 pt-3">
         <div className="min-w-0 flex-1">
           <RowActions sheet="booking" row={row} status={status} actions={actions} show={["confirm"]} hideMsg />
         </div>

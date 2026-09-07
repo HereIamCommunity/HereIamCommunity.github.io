@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { BTN_OUTLINE, telHref } from "./shared";
+import { BTN_OUTLINE, CARD, CARD_STACK, telHref } from "./shared";
 
 export type EntryField = { label: string; value: string; tel?: boolean };
 
@@ -28,7 +28,7 @@ export default function EntryCard({
   const detailId = useId();
 
   return (
-    <li className="rounded-xl border border-gray-200 bg-white p-4">
+    <li className={`${CARD} ${CARD_STACK}`}>
       <div className="mb-3 flex items-start gap-2">
         <p className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-base font-medium text-brown">
           {title}
@@ -53,7 +53,7 @@ export default function EntryCard({
         ))}
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-auto flex flex-wrap items-center gap-2 pt-3">
         {actions}
         <button
           type="button"

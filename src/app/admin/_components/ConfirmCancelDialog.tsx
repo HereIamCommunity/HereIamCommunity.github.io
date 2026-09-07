@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BTN_DANGER, BTN_OUTLINE } from "./shared";
+import { BTN_DANGER, BTN_OUTLINE, FIELD } from "./shared";
 
 export const CANCEL_REASONS = ["게스트 요청", "입금 없음", "중복 신청", "기타"] as const;
 
@@ -52,7 +52,7 @@ export default function ConfirmCancelDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="cancel-dialog-title"
-        className="relative w-full max-w-md rounded-t-2xl border border-gray-200 bg-white p-5 shadow-lg sm:rounded-2xl"
+        className="relative w-full max-w-md rounded-t-xl border border-gray-200 bg-white p-4 shadow-lg sm:rounded-xl md:p-5"
       >
         <h2 id="cancel-dialog-title" className="text-base font-medium text-brown">
           예약을 취소할까요?
@@ -75,7 +75,7 @@ export default function ConfirmCancelDialog({
               id="cancel-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-brown"
+              className={FIELD}
             >
               <option value="">선택 안 함</option>
               {CANCEL_REASONS.map((r) => (
