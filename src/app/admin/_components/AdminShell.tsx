@@ -211,7 +211,7 @@ export default function AdminShell({
         </div>
       )}
 
-      <div className="mb-5 -mx-4 overflow-x-auto px-4 md:mx-0 md:px-0">
+      <div className="mb-5 -mx-4 overflow-x-auto px-4 scroll-px-4 md:mx-0 md:px-0">
         <div role="tablist" aria-label="어드민 화면" className="flex w-max gap-5 border-b border-gray-200">
           {TABS.map((t) => (
             <button
