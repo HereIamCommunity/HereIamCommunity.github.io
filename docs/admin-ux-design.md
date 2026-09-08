@@ -173,3 +173,32 @@ export function buildStats(bookings: string[][], now?: Date): Stats; // 헤더 �
 - `dataviz` 스킬을 먼저 로드해 색·막대·축·툴팁 규칙을 따른다. 색은 토큰: 살롱 `bg-orange`, 스테이 `bg-teal`, 비교 증가 `text-teal-dark`, 감소 `text-orange-dark`(값 옆 아이콘/부호 병기, 색만으로 전달 금지).
 - 막대는 `div` 높이 비율. 컨테이너 `overflow-x-auto`, 일별 30개 막대는 최소 폭 확보(막대당 ≥ 16px + gap). 라벨 `whitespace-nowrap`, 긴 축은 격일/격월 라벨 생략.
 - AdminShell TABS에 `{ key: "stats", label: "통계" }` 추가, preview에도 반영.
+
+## 6. 운영 피드백 반영 (2026-09-08, 배포 후)
+
+### 6.1 행 식별을 시트 행 번호로 (Max)
+- 문제: 연락처·신청일시가 빈 행(시트에 손으로 넣은 스테이 10건)은 `findBookingRow`가 못 찾아 입금확인이 400 "예약 정보가 없습니다"로 실패. 화면엔 작은 글씨로만 남아 "아무것도 안 뜨는" 것처럼 보임.
+- `getAllBookings`가 각 행에 **출처 탭과 시트 행 번호**를 붙인다: 반환 형태를 `{ header, rows: { tab: "살롱"|"스테이", rowNum: number, values: string[] }[] }`로 바꾸지 말고, 호환 위해 기존 `string[][]`는 유지하되 **각 행 끝에 숨은 열 없이** 별도 배열 `meta: { tab, rowNum }[]`를 `/api/admin/bookings` 응답에 추가한다 (`{ rows, retreats, openStays, meta }`). 리트릿·무료개방도 동일하게 `retreatMeta`, `openMeta`.
+- `POST /api/admin/status`·`/resend` body에 `ref?: { tab: string; rowNum: number }` 추가. `ref`가 있으면 **행 번호로 직접** 읽고 쓴다(`findBookingRow` 우회). 없으면 기존 방식. `updateNotifyStatus`·`updateBookingStatus`·`appendBookingMemo`에 `ref` 인자 경로 추가.
+- `row[3]`(연락처) 필수 검사 제거. 연락처가 없으면 알림 발송은 `skipped`로 두고 상태 변경은 진행. 응답에 `notify.guest === "skipped"` 사유 `"연락처 없음"`을 포함.
+- 신청일시가 빈 행은 목록에서 **정렬 맨 아래**, 신청일 칸은 "—".
+
+### 6.2 처리 결과 팝업 (Esther)
+- 입금확인·취소·재발송·되돌리기 결과를 행 안 텍스트 **대신** 화면 우상단 **토스트**(`role="status"`, `aria-live="polite"`)로 띄운다. 성공: teal 배경 "김성연 · 입금확인 완료 · 게스트 알림톡 발송됨", 실패: orange 배경 "입금확인 실패 — 예약 정보가 없습니다" + [다시 시도]. 5초 후 자동 닫힘, 호버 시 유지, 닫기 버튼. 여러 개면 세로로 쌓임(최대 3).
+- 실패 시 토스트 외에 해당 행도 빨간 테두리 2초 강조.
+- 처리 중엔 버튼 스피너 + 행 전체 `opacity-60`, 완료 후 목록 재조회.
+
+### 6.3 목록을 리스트형으로 (Esther)
+- 목록 탭·오늘 탭 입금대기 섹션의 **카드형 제거**. 모든 폭에서 **한 줄 리스트 행**:
+  - `md` 이상: 표 (열: 신청일 · 이름 · 구분 · 내용 · 일시 · 금액 · 연락처 · 상태 · 알림 · 처리). 처리 열 sticky right, 이름 sticky left.
+  - `md` 미만: 2줄 리스트 행 — 1줄 `이름  구분·내용  [상태배지]`, 2줄 `신청일 · 일시 · 금액 · 연락처(tel)`, 3줄(있을 때만) `알림 상태 + 버튼들`. 행 구분선만, 카드 테두리·라운드 없음. 행 탭하면 drawer.
+- **신청일** 열/항목 추가: A열 `parseSheetDateTime` → `M/D HH:mm`, 빈값 "—". 표 기본 정렬 신청일 내림차순 유지.
+- 리트릿·무료개방 탭도 같은 리스트형(카드 제거).
+
+### 6.4 고정 헤더 + 검색창 (Esther)
+- AdminShell 헤더(제목·날짜·새로고침·로그아웃 + 이번 달 스트립 + 탭 스트립)를 `sticky top-0 z-30 bg-cream/95 backdrop-blur`로 고정. 본문 `scroll-mt`로 앵커 보정.
+- 헤더 안에 **전역 검색창** (탭 스트립 오른쪽, `md` 미만은 탭 스트립 아래 한 줄): placeholder "이름·연락처·프로그램 검색", 입력 시 자동으로 목록 탭으로 이동하고 `listFilters.searchInput`에 반영(200ms 디바운스). 결과 건수 표시. `/` 키로 포커스, Esc로 비움.
+- 목록 탭 안의 기존 검색 input은 제거(전역 검색창으로 통합), 구분·상태·기간 칩은 유지.
+
+### AC
+기존 AC + `POST /api/admin/status` with `ref` 경로 테스트(순수 함수로 분리 가능한 부분), 연락처 없는 행에 confirm → 200 + guest skipped. 스크린샷 390/1280 today·list 재촬영.
