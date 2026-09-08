@@ -1,11 +1,20 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { buildDigest, kstToday } from "@/lib/digest";
 import AdminShell from "../_components/AdminShell";
 import Banner from "../_components/Banner";
+import { useToasts } from "../_components/Toast";
+import type { RowRef, SheetTab } from "@/lib/row-ref";
 import type { ApiResult } from "../_components/useAdminApi";
-import { rowKey, type AdminActions, type DateRange, type Row, type RowMsg } from "../_components/shared";
+import {
+  registerRowRefs,
+  rowKey,
+  type AdminActions,
+  type DateRange,
+  type Row,
+  type SheetKind,
+} from "../_components/shared";
 
 /* ── 샘플 데이터 ────────────────────────────────
    시트 자격증명 없이도 "데이터가 있는 화면"을 볼 수 있게 만든 미리보기 전용 페이지.
@@ -58,6 +67,10 @@ function sampleBookings(): Row[] {
     // 취소 2건
     [createdAt(3, 13), "살롱", "오세라", "010-7890-1234", "목요 북클럽", salonLabel(4, "20:00"), "", "", "", "", "없음", "20000", "[취소사유] 게스트 요청", "취소", `❌ ${nowStamp} 취소 실패 (번호 오류)`],
     [createdAt(4, 8), "스테이", "강태현", "010-8901-2345", "", "", "나그네방", "1", day(7), day(8), "없음", "60000", "", "취소", `✅ ${nowStamp} 취소`],
+    // 시트에 손으로 넣은 스테이 — 신청일시·연락처가 비어 있다 (6.1이 고친 그 행들).
+    // 신청일 칸은 "—", 목록 정렬은 맨 아래, 알림은 재발송 버튼이 붙는 "미발송"이 된다.
+    ["", "스테이", "김성연", "", "", "", "여태방", "2", day(6), day(8), "없음", "150000", "전화로 받은 예약", "", ""],
+    ["", "스테이", "장미옥", "", "", "", "나그네방", "1", day(9), day(10), "없음", "60000", "", "", ""],
     // 통계 탭이 월별·연도별 비교를 보여줄 수 있게 지난 달·작년 행도 넣어 둔다
     [createdAt(34, 19), "살롱", "서지호", "010-9012-3456", "프라이데이 나잇 · 와인과 대화", salonLabel(-32, "19:00"), "", "", "", "", "없음", "30000", "", "입금확인", `✅ 접수`],
     [createdAt(38, 15), "살롱", "노유진", "010-0123-4567", "토요 브런치 살롱", salonLabel(-36, "11:00"), "", "", "", "", "멤버십 '곁'", "22500", "", "결제완료", `✅ 확정`],
@@ -104,8 +117,17 @@ const SAMPLE_ENV = {
   operatorPhoneMasked: "010-****-1234",
 };
 
+/** 실제 API의 meta(6.1)를 흉내 낸다 — rows와 길이·순서가 같고 meta[0]은 헤더 행 */
+function sampleMeta(rawRows: Row[], tabOf: (row: Row) => SheetTab): RowRef[] {
+  return rawRows.map((row, i) => ({ tab: tabOf(row), rowNum: i + 1 }));
+}
+
 export default function AdminPreviewPage() {
-  const [rowMsg, setRowMsg] = useState<Record<string, RowMsg>>({});
+  const toasts = useToasts();
+  const { push } = toasts;
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<string | null>(null);
+  const turn = useRef(0);
 
   const rawRows = useMemo(() => sampleBookings(), []);
   const rawRetreats = useMemo(() => sampleRetreats(), []);
@@ -113,17 +135,46 @@ export default function AdminPreviewPage() {
   const airbnbRanges = useMemo(() => sampleAirbnb(), []);
   const digest = useMemo(() => buildDigest(rawRows, rawRetreats), [rawRows, rawRetreats]);
 
-  const note = useCallback(
-    (key: string) =>
-      setRowMsg((prev) => ({ ...prev, [key]: { ok: false, text: "미리보기 화면이라 저장되지 않아요." } })),
-    []
+  // 화면 전체가 시트 행 번호로 행을 찍는지(6.1) 미리보기에서도 그대로 확인할 수 있게 등록해 둔다
+  useMemo(() => {
+    registerRowRefs(rawRows, sampleMeta(rawRows, (r) => (r[1] === "스테이" ? "스테이" : "살롱")));
+    registerRowRefs(rawRetreats, sampleMeta(rawRetreats, () => "리트릿"));
+    registerRowRefs(rawOpenStays, sampleMeta(rawOpenStays, () => "무료개방"));
+  }, [rawRows, rawRetreats, rawOpenStays]);
+
+  /** 미리보기 처리 — 스피너를 잠깐 보여주고 성공·실패 토스트를 번갈아 띄운다 */
+  const pretend = useCallback(
+    (key: string, name: string, label: string, retry: () => void) => {
+      setBusyKey(key);
+      setTimeout(() => {
+        setBusyKey(null);
+        const ok = turn.current++ % 2 === 0;
+        if (ok) {
+          push({ kind: "ok", text: `${name} · ${label} 완료 · 게스트 알림톡 발송됨 (미리보기)` });
+          return;
+        }
+        push({ kind: "error", text: `${label} 실패 — 예약 정보가 없습니다 (미리보기)`, onRetry: retry });
+        setErrorKey(key);
+        setTimeout(() => setErrorKey(null), 2000);
+      }, 500);
+    },
+    [push]
   );
 
   const actions: AdminActions = {
-    busyKey: null,
-    rowMsg,
-    changeStatus: (sheet, row) => note(rowKey(sheet, row)),
-    resend: (row) => note(rowKey("booking", row)),
+    busyKey,
+    errorKey,
+    changeStatus: (sheet: SheetKind, row: Row, action) => {
+      const key = rowKey(sheet, row);
+      const label = action === "confirm" ? "입금확인" : action === "cancel" ? "취소" : "되돌리기";
+      pretend(key, (sheet === "booking" ? row[2] : row[1]) || "이름 없음", label, () =>
+        actions.changeStatus(sheet, row, action)
+      );
+    },
+    resend: (row: Row) => {
+      const key = rowKey("booking", row);
+      pretend(key, row[2] || "이름 없음", "재발송", () => actions.resend(row));
+    },
   };
 
   // SettingsTab이 이 함수를 useEffect 의존성으로 쓴다 — 매 렌더 새로 만들면 무한 루프
@@ -148,6 +199,7 @@ export default function AdminPreviewPage() {
       error=""
       onRefresh={() => {}}
       onLogout={() => {}}
+      toasts={toasts}
       topSlot={
         <div className="mb-4">
           <Banner

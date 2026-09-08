@@ -6,6 +6,7 @@ import {
   isSendable,
   kstStamp,
   planMessages,
+  sendBookingMessages,
   fill,
   type Booking,
 } from "@/lib/kakao";
@@ -367,5 +368,50 @@ describe("호스트 문자 — 누가·언제·무엇을·어떤 액션", () => 
     expect(buildHostMessage("cancelled", salon, { at }).text).toContain("환불 처리가 필요해요");
     expect(buildHostMessage("confirmed", salon, { at }).text).not.toContain("눌러주세요");
     expect(buildHostMessage("received", salon, { at }).text).toContain("koinonia-web.vercel.app/admin");
+  });
+});
+
+/* ─── 연락처 없는 행 (시트 수기 입력) ───────────── */
+describe("연락처 없는 행", () => {
+  const SOLAPI_KEYS = ["SOLAPI_API_KEY", "SOLAPI_API_SECRET", "SOLAPI_SENDER_PHONE", "OPERATOR_PHONE"];
+  const savedSolapi: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const k of SOLAPI_KEYS) {
+      savedSolapi[k] = process.env[k];
+      delete process.env[k];
+    }
+    process.env.SOLAPI_API_KEY = "key";
+    process.env.SOLAPI_API_SECRET = "secret";
+    process.env.SOLAPI_SENDER_PHONE = "01000000000";
+    // OPERATOR_PHONE은 비워 둔다 — 호스트 발송까지 건너뛰어 네트워크를 타지 않는다.
+  });
+
+  afterEach(() => {
+    for (const k of SOLAPI_KEYS) {
+      if (savedSolapi[k] === undefined) delete process.env[k];
+      else process.env[k] = savedSolapi[k];
+    }
+  });
+
+  it("연락처가 비면 게스트는 skipped이고 사유가 '연락처 없음'", async () => {
+    const r = await sendBookingMessages("confirmed", { ...stay, phone: "" });
+    expect(r.guest).toBe("skipped");
+    expect(r.guestSkipReason).toBe("연락처 없음");
+  });
+
+  it("숫자가 하나도 없는 연락처도 연락처 없음으로 본다", async () => {
+    const r = await sendBookingMessages("cancelled", { ...stay, phone: "-" });
+    expect(r.guest).toBe("skipped");
+    expect(r.guestSkipReason).toBe("연락처 없음");
+  });
+
+  it("호스트 문자는 '템플릿 미설정'이 아니라 연락처 없음을 알린다", () => {
+    const text = buildHostMessage("confirmed", { ...stay, phone: "" }, {
+      guestResult: "skipped",
+      guestSkipReason: "연락처 없음",
+    }).text;
+    expect(text).toContain("연락처 없음");
+    expect(text).not.toContain("템플릿 미설정");
   });
 });

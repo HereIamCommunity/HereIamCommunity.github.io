@@ -1,7 +1,7 @@
 "use client";
 
 import { RETREAT_CAPACITY, RETREAT_SESSIONS } from "@/lib/retreat-sessions";
-import EntryCard from "./EntryCard";
+import EntryList, { TelCell } from "./EntryList";
 import RowActions from "./RowActions";
 import StatusBadge from "./StatusBadge";
 import SummaryCard from "./SummaryCard";
@@ -10,9 +10,9 @@ import {
   CARD_FLUSH,
   CARD_GRID,
   SECTION_H,
+  createdShort,
   retreatStatus,
   rowKey,
-  shortDateTime,
   type AdminActions,
   type Row,
 } from "./shared";
@@ -51,11 +51,7 @@ export default function RetreatTab({
       </section>
 
       {loading ? (
-        <ul className={`${CARD_GRID} md:grid-cols-2`} aria-busy="true">
-          {[0, 1].map((i) => (
-            <li key={i} className={`${CARD_FLUSH} h-40 animate-pulse`} />
-          ))}
-        </ul>
+        <div className={`${CARD_FLUSH} h-64 animate-pulse`} aria-busy="true" />
       ) : retreats.length === 0 ? (
         <div className={CARD_EMPTY}>
           <p className="text-sm font-medium text-brown">아직 리트릿 신청이 없어요</p>
@@ -64,37 +60,45 @@ export default function RetreatTab({
           </p>
         </div>
       ) : (
-        <ul className={`${CARD_GRID} md:grid-cols-2`}>
-          {retreats.map((row, i) => {
+        <EntryList
+          caption="리트릿 신청 목록 — [상세]를 누르면 추천인·요청사항 등을 볼 수 있습니다."
+          heads={["신청일", "이름", "회차", "학년", "지역", "연락처", "상태", "처리"]}
+          items={retreats.map((row) => {
             const status = retreatStatus(row);
-            return (
-              <EntryCard
-                key={`${rowKey("retreat", row)}-${i}`}
-                title={row[1] || "이름 없음"}
-                badge={<StatusBadge status={status} />}
-                message={actions.rowMsg[rowKey("retreat", row)]}
-                fields={[
-                  { label: "회차", value: row[5] },
-                  { label: "학년", value: row[3] },
-                  { label: "지역", value: row[4] },
-                  { label: "연락처", value: row[2], tel: true },
-                ]}
-                details={[
-                  { label: "신청일시", value: shortDateTime(row[0]) },
-                  { label: "추천인", value: row[6] },
-                  { label: "궁금한점", value: row[7] },
-                  { label: "요청사항", value: row[8] },
-                  { label: "알레르기", value: row[9] },
-                  { label: "케어사항", value: row[10] },
-                  { label: "부모님", value: row[11] },
-                ]}
-                actions={
-                  <RowActions sheet="retreat" row={row} status={status} actions={actions} size="sm" hideMsg />
-                }
-              />
-            );
+            const id = rowKey("retreat", row);
+            return {
+              id,
+              name: row[1] || "이름 없음",
+              badge: <StatusBadge status={status} />,
+              busy: actions.busyKey === id,
+              failed: actions.errorKey === id,
+              cells: [
+                createdShort(row[0]),
+                row[1] || "이름 없음",
+                row[5] || "—",
+                row[3] || "—",
+                row[4] || "—",
+                <TelCell key="tel" phone={row[2]} />,
+                <StatusBadge key="st" status={status} />,
+              ],
+              meta: [
+                createdShort(row[0]),
+                row[5] || "회차 미정",
+                `${row[3] || "?"} · ${row[4] || "지역 미기재"}`,
+                <TelCell key="tel" phone={row[2]} />,
+              ],
+              actions: <RowActions sheet="retreat" row={row} status={status} actions={actions} size="sm" />,
+              details: [
+                { label: "추천인", value: row[6] },
+                { label: "궁금한점", value: row[7] },
+                { label: "요청사항", value: row[8] },
+                { label: "알레르기", value: row[9] },
+                { label: "케어사항", value: row[10] },
+                { label: "부모님", value: row[11] },
+              ],
+            };
           })}
-        </ul>
+        />
       )}
     </div>
   );

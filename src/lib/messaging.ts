@@ -12,6 +12,7 @@ import {
   type SendResult,
 } from "@/lib/kakao";
 import { updateNotifyStatus } from "@/lib/sheets";
+import type { RowRef } from "@/lib/row-ref";
 
 const EVENT_SHORT: Record<BookingEvent, string> = {
   received: "접수",
@@ -44,7 +45,10 @@ export function notifyStatusText(event: BookingEvent, result: SendBookingResult)
 
   let base: string;
   if (guest === "ok") base = `✅ ${nowHHMM()} ${short}`;
-  else if (guest === "skipped") base = `⏭ ${nowHHMM()} ${short} 건너뜀`;
+  else if (guest === "skipped") {
+    const why = result.guestSkipReason ? `(${result.guestSkipReason})` : "";
+    base = `⏭ ${nowHHMM()} ${short} 건너뜀${why}`;
+  }
   else base = `❌ ${short} 실패: ${guest.error}`;
 
   const hostFailed = typeof result.host === "object";
@@ -54,7 +58,7 @@ export function notifyStatusText(event: BookingEvent, result: SendBookingResult)
 export async function notifyBooking(
   event: BookingEvent,
   booking: Booking,
-  opts?: { recordToSheet?: boolean }
+  opts?: { recordToSheet?: boolean; ref?: RowRef }
 ): Promise<NotifyResult> {
   const result = await sendBookingMessages(event, booking);
 
@@ -65,7 +69,8 @@ export async function notifyBooking(
         booking.type,
         booking.createdAt ?? "",
         booking.phone,
-        notifyStatusText(event, result)
+        notifyStatusText(event, result),
+        opts?.ref
       );
     } catch (e) {
       console.error("[NOTIFY] 시트 기록 실패", e);

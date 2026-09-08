@@ -95,6 +95,8 @@ export type SendBookingResult = {
   guest: SendResult;
   host: SendResult;
   groupId?: string;
+  /** 게스트를 건너뛴 이유 (예: "연락처 없음"). guest === "skipped"일 때만 있다. */
+  guestSkipReason?: string;
 };
 
 /* ─── 헬퍼 ──────────────────────────────────────── */
@@ -218,6 +220,8 @@ export function buildGuestMessage(event: BookingEvent, booking: Booking): BuiltM
 export type HostContext = {
   /** 게스트 알림 발송 결과. 있으면 호스트 문자 끝에 안내를 덧붙인다. */
   guestResult?: SendResult;
+  /** 게스트를 건너뛴 이유 (예: "연락처 없음"). */
+  guestSkipReason?: string;
   /** 액션 시각 (기본 now). 테스트용. */
   at?: Date;
 };
@@ -256,7 +260,7 @@ function hostNextLines(event: BookingEvent, ctx: HostContext): string[] {
   const guestLine =
     guest === undefined ? null
     : guest === "ok" ? "게스트에게 안내 알림톡을 보냈어요."
-    : guest === "skipped" ? "게스트 알림은 아직 발송되지 않았어요 (템플릿 미설정)."
+    : guest === "skipped" ? `게스트 알림은 아직 발송되지 않았어요 (${ctx.guestSkipReason ?? "템플릿 미설정"}).`
     : `게스트 알림 발송 실패 (${guest.error.replace(/\.$/, "")}). 어드민에서 재발송해 주세요.`;
   const next =
     event === "received" ? "입금이 확인되면 어드민에서 '입금확인'을 눌러주세요."
@@ -375,26 +379,32 @@ export async function sendBookingMessages(
   const client = new SolapiMessageService(process.env.SOLAPI_API_KEY!, process.env.SOLAPI_API_SECRET!);
 
   // 1) 게스트 먼저 — 결과를 호스트 문자에 실어야 하므로 순서대로 보낸다.
+  //    연락처가 빈 행(시트 수기 입력)도 게스트만 건너뛰고 호스트 알림·상태 변경은 그대로 간다.
   let guest: SendResult = "skipped";
+  let guestSkipReason: string | undefined;
   let groupId: string | undefined;
   if (plan.guest && guestTo) {
     const r = await sendSingle(client, { to: guestTo, from, text: plan.guest.text, kakaoOptions: plan.guest.kakaoOptions });
     guest = r.result;
     groupId = r.groupId;
   } else if (!opts.hostOnly) {
-    console.warn(`[NOTIFY] 템플릿 미설정 — ${event} 게스트 발송 건너뜀`);
+    guestSkipReason = guestTo ? "템플릿 미설정" : "연락처 없음";
+    console.warn(`[NOTIFY] ${guestSkipReason} — ${event} 게스트 발송 건너뜀`);
   }
 
   // 2) 호스트 — 게스트 결과 포함
   let host: SendResult = "skipped";
   if (plan.host && hostTo) {
-    const m = buildHostMessage(event, booking, { guestResult: opts.hostOnly ? undefined : guest });
+    const m = buildHostMessage(event, booking, {
+      guestResult: opts.hostOnly ? undefined : guest,
+      guestSkipReason,
+    });
     const r = await sendSingle(client, { to: hostTo, from, text: m.text, kakaoOptions: m.kakaoOptions });
     host = r.result;
     groupId = groupId ?? r.groupId;
   }
 
-  return { guest, host, groupId };
+  return { guest, host, groupId, ...(guestSkipReason ? { guestSkipReason } : {}) };
 }
 
 async function sendSingle(
