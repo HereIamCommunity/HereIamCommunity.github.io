@@ -164,7 +164,11 @@ export function parseNotifyCell(cell: string | undefined): { kind: NotifyKind; t
   if (!raw) return { kind: "none", text: "미발송" };
   if (raw.startsWith("✅")) return { kind: "sent", text: raw.replace(/^✅\s*/, "") || "발송됨" };
   if (raw.startsWith("❌")) return { kind: "failed", text: raw.replace(/^❌\s*/, "") || "발송 실패" };
-  if (raw.startsWith("⏭")) return { kind: "skipped", text: "건너뜀(템플릿 미설정)" };
+  if (raw.startsWith("⏭")) {
+    // O열 예: "⏭ 14:32 확정 건너뜀(연락처 없음)" — 괄호 안 사유가 있으면 그대로, 없으면 템플릿 미설정
+    const m = raw.match(/건너뜀\(([^)]+)\)/);
+    return { kind: "skipped", text: m ? `건너뜀(${m[1]})` : "건너뜀(템플릿 미설정)" };
+  }
   return { kind: "none", text: raw };
 }
 

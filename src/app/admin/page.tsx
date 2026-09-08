@@ -41,12 +41,13 @@ type LoadResult =
 
 /** 알림 결과를 사람이 읽는 한 줄로 */
 function notifySuffix(notify: unknown): string {
-  const n = notify as { guest?: unknown; reason?: unknown } | undefined;
+  const n = notify as { guest?: unknown; guestSkipReason?: unknown } | undefined;
   const guest = n?.guest;
   if (guest === "ok") return " · 게스트 알림톡 발송됨";
   if (guest === "skipped") {
     // 6.1에서 "연락처 없음"처럼 사유가 함께 오면 그대로 보여준다
-    const reason = typeof n?.reason === "string" && n.reason ? n.reason : "환경변수 미설정";
+    const r = n?.guestSkipReason;
+    const reason = typeof r === "string" && r ? r : "템플릿 미설정";
     return ` · 알림 건너뜀 (${reason})`;
   }
   if (guest && typeof guest === "object" && "error" in guest) {
