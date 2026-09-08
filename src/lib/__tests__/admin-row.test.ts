@@ -99,3 +99,30 @@ describe("eventForStatus", () => {
     expect(eventForStatus("취소")).toBe("cancelled");
   });
 });
+
+describe("parseAdminRow · 시트에 손으로 넣은 짧은 행", () => {
+  // 실제 운영 시트: 연락처·신청일시가 비고 열이 10개까지만 있는 스테이 행
+  const shortStay = ["", "스테이", "홍길동", "", "", "", "여태방", "3", "2026-09-04", "2026-09-07"];
+
+  it("열이 10개뿐이어도 예외 없이 파싱된다", () => {
+    expect(parseAdminRow(shortStay)).toEqual({
+      type: "stay",
+      createdAt: "",
+      name: "홍길동",
+      phone: "",
+      program: undefined,
+      date: undefined,
+      room: "여태방",
+      checkIn: "2026-09-04",
+      checkOut: "2026-09-07",
+      nights: 3,
+      discount: "none",
+      totalAmount: 0,
+      via: "admin",
+    });
+  });
+
+  it("상태·알림 열이 없어도 eventForStatus는 received", () => {
+    expect(eventForStatus(shortStay[13] ?? "")).toBe("received");
+  });
+});

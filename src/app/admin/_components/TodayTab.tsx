@@ -1,8 +1,10 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import { ageDays, type Digest } from "@/lib/digest";
 import Banner from "./Banner";
-import BookingCard from "./BookingCard";
+import BookingDrawer from "./BookingDrawer";
+import BookingList from "./BookingList";
 import StatusBadge from "./StatusBadge";
 import SummaryCard from "./SummaryCard";
 import {
@@ -62,7 +64,7 @@ function Section({
   children?: React.ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-24">
+    <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-56 md:scroll-mt-48">
       <div className="mb-2 flex items-baseline justify-between gap-3">
         <h2 id={`${id}-h`} className={SECTION_H}>
           {title}
@@ -94,6 +96,8 @@ export default function TodayTab({
 }) {
   const pending = digest.pending;
   const oldest = pending.length > 0 ? ageDays(pending[0][0]) : 0;
+  const [selected, setSelected] = useState<Row | null>(null);
+  const closeDrawer = useCallback(() => setSelected(null), []);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -165,11 +169,7 @@ export default function TodayTab({
         count={pending.length}
         empty="입금대기 건이 없어요."
       >
-        <ul className={`${CARD_GRID} md:grid-cols-2`}>
-          {pending.map((row, i) => (
-            <BookingCard key={`p-${row[0]}-${row[3]}-${i}`} row={row} actions={actions} />
-          ))}
-        </ul>
+        <BookingList rows={pending} actions={actions} onSelect={setSelected} />
       </Section>
 
       <Section id="today-checkin" title="오늘 체크인" count={digest.checkIns.length} empty="오늘 들어오는 손님이 없어요.">
@@ -213,6 +213,8 @@ export default function TodayTab({
           ))}
         </ul>
       </Section>
+
+      <BookingDrawer row={selected} actions={actions} onClose={closeDrawer} />
     </div>
   );
 }

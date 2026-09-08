@@ -1,9 +1,11 @@
-import { normalizeDate, parseSheetDateTime } from "@/lib/digest";
+import { isConfirmed, isPending, normalizeDate, parseSheetDateTime } from "@/lib/digest";
+import type { RowRef } from "@/lib/row-ref";
 
 /** 시트 한 행 (예약 A~O · 리트릿 A~M · 무료개방 A~L) */
 export type Row = string[];
 
-export type RowMsg = { ok: boolean; text: string };
+/** 시트 행 식별자 (6.1 계약) — `/api/admin/bookings`의 meta·retreatMeta·openMeta 원소 */
+export type { RowRef };
 
 /** 상태를 바꿀 수 있는 시트 종류 (`POST /api/admin/status`의 sheet 파라미터) */
 export type SheetKind = "booking" | "retreat" | "open";
@@ -12,7 +14,8 @@ export type StatusAction = "confirm" | "cancel" | "reopen";
 /** 목록·오늘·리트릿·무료개방 탭이 공유하는 행 액션 묶음 */
 export type AdminActions = {
   busyKey: string | null;
-  rowMsg: Record<string, RowMsg>;
+  /** 마지막으로 실패한 행 — 2초 동안 테두리로 강조한다 (결과 문구는 토스트가 맡는다) */
+  errorKey: string | null;
   changeStatus: (sheet: SheetKind, row: Row, action: StatusAction, reason?: string) => void;
   resend: (row: Row) => void;
 };
@@ -25,8 +28,39 @@ export const ROOM_NAMES: Record<string, string> = {
 export const ROOM_KEYS = ["nagnae", "oksun", "yeutae"] as const;
 export type RoomKey = (typeof ROOM_KEYS)[number];
 
-/** 행 식별 키 — 신청일시 + 연락처 (시트 업데이트가 쓰는 것과 같은 조합) */
+/* ── 시트 행 번호 레지스트리 (6.1 계약) ──────────────────────
+   행은 화면 전체에서 `string[]` 그대로 흘러다니고 digest·필터·정렬이 같은 배열 참조를
+   유지한다. ref를 프롭으로 나르면 컴포넌트 8곳의 시그니처가 전부 바뀌므로,
+   행 배열의 정체성에 WeakMap으로 붙여 둔다. 등록은 데이터를 받은 쪽(page/preview)이 한 번만 한다. */
+const REF_BY_ROW = new WeakMap<Row, RowRef>();
+
+/**
+ * `meta`를 원본 행 배열(헤더 포함)에 붙인다.
+ * meta가 헤더를 포함하든(length === rawRows.length) 빼든(length === rawRows.length - 1)
+ * 같은 결과가 나오도록 오프셋을 길이로 판별한다.
+ */
+export function registerRowRefs(rawRows: Row[], meta: RowRef[] | undefined): void {
+  if (!meta || meta.length === 0) return;
+  const offset = meta.length === rawRows.length ? 1 : 0;
+  for (let i = 1; i < rawRows.length; i++) {
+    const m = meta[i - 1 + offset];
+    if (m && typeof m.rowNum === "number") REF_BY_ROW.set(rawRows[i], { tab: m.tab, rowNum: m.rowNum });
+  }
+}
+
+/** 등록된 시트 행 번호. 없으면 undefined (API가 meta를 아직 안 주는 경우) */
+export function rowRef(row: Row): RowRef | undefined {
+  return REF_BY_ROW.get(row);
+}
+
+/**
+ * 행 식별 키.
+ * ref가 있으면 시트 행 번호로 만든다 — 연락처·신청일시가 둘 다 빈 행이 여럿이면
+ * 예전 키(신청일시|연락처)가 충돌해 엉뚱한 행이 같이 강조되던 문제가 있었다.
+ */
 export function rowKey(sheet: SheetKind, row: Row): string {
+  const ref = REF_BY_ROW.get(row);
+  if (ref) return `${sheet}:${ref.tab}#${ref.rowNum}`;
   const phone = sheet === "booking" ? row[3] : row[2];
   return `${sheet}:${row[0] ?? ""}|${phone ?? ""}`;
 }
@@ -78,6 +112,28 @@ export function shortDateTime(raw: string): string {
   const d = parseSheetDateTime(raw ?? "");
   if (!d) return raw ?? "";
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** 신청일 — "M/D HH:mm". 못 읽거나 비었으면 "—" (시트에 손으로 넣은 행) */
+export function createdShort(raw: string | undefined): string {
+  const d = parseSheetDateTime(raw ?? "");
+  if (!d) return "—";
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** 신청일시의 정렬용 값. 못 읽으면 null → 항상 맨 아래로 보낸다. */
+export function createdTime(raw: string | undefined): number | null {
+  return parseSheetDateTime(raw ?? "")?.getTime() ?? null;
+}
+
+/** 신청일 내림차순. 신청일시를 못 읽는 행은 순서와 상관없이 맨 아래. */
+export function byCreatedDesc(a: Row, b: Row): number {
+  const ta = createdTime(a[0]);
+  const tb = createdTime(b[0]);
+  if (ta === null && tb === null) return 0;
+  if (ta === null) return 1;
+  if (tb === null) return -1;
+  return tb - ta;
 }
 
 /** 연락처를 tel: 링크용으로 정리 */
@@ -143,6 +199,31 @@ export function inPeriod(createdAt: string, period: Period, todayISO: string): b
   return iso.slice(0, 7) === todayISO.slice(0, 7);
 }
 
+/** 상태 칩 필터와 시트 상태값을 맞춘다 */
+export function matchStatusFilter(status: string, filter: StatusFilter): boolean {
+  if (filter === "전체") return true;
+  if (filter === "취소") return status === "취소";
+  if (filter === "확정") return isConfirmed(status);
+  return isPending(status) || !status;
+}
+
+/**
+ * 목록 탭의 필터 + 검색 + 정렬. 전역 검색창의 "N건"과 목록이 항상 같은 결과를 쓰도록
+ * AdminShell(건수)과 ListTab(목록)이 이 함수 하나를 공유한다.
+ */
+export function filterBookings(rows: Row[], filters: ListFilters, todayISO: string): Row[] {
+  const q = filters.searchInput.trim();
+  return rows
+    .filter((row) => {
+      if (filters.typeFilter !== "전체" && row[1] !== filters.typeFilter) return false;
+      if (!matchStatusFilter(bookingStatus(row), filters.statusFilter)) return false;
+      if (!inPeriod(row[0], filters.period, todayISO)) return false;
+      if (!q) return true;
+      return [row[2], row[3], row[4], row[6]].some((c) => (c ?? "").includes(q));
+    })
+    .sort(byCreatedDesc);
+}
+
 /* ── 버튼 클래스 (높이 2종만: 44px / 36px · 라벨은 항상 한 줄) ── */
 export const BTN_BASE =
   "inline-flex items-center justify-center h-11 px-4 rounded-lg text-sm font-medium whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
@@ -181,9 +262,24 @@ export const STAT_LABEL = "whitespace-nowrap text-xs tracking-wide text-gray-500
 export const SECTION_H = "whitespace-nowrap text-sm font-medium text-brown";
 export const SECTION_COUNT = "whitespace-nowrap text-xs text-gray-500";
 
-/** 표 헤더·셀 패딩 (BookingTable · BucketTable 공통) */
+/** 표 헤더·셀 패딩 (BookingList · EntryList · BucketTable 공통) */
 export const TH_CELL = "whitespace-nowrap px-4 py-3 text-xs font-medium text-gray-700";
 export const TD_CELL = "whitespace-nowrap px-4 py-3";
+
+/* ── 리스트형 목록 (6.3) ─────────────────────────────
+   카드 테두리·라운드 없이 구분선만. md 미만 행과 md 이상 표가 같은 톤을 쓴다. */
+/** md 미만 리스트 행 */
+export const LIST_ROW = "relative border-b border-gray-100 px-4 py-3 last:border-0";
+/** 처리 중 — 행 전체를 흐리게 */
+export const ROW_BUSY = "opacity-60";
+/** 방금 실패한 행 — 2초 강조 (색만으로 알리지 않도록 토스트가 같은 내용을 말한다).
+    가로 고정 셀은 자기 배경을 갖고 있어 행 배경을 덮으므로 CELL_BG로 같이 맞춰준다. */
+export const ROW_FAILED = "outline-2 -outline-offset-2 outline-orange-dark bg-orange/10";
+/** 고정 셀 배경 — 실패 강조 중에는 행과 같은 색이어야 강조가 끊겨 보이지 않는다 */
+export const cellBg = (failed: boolean) => (failed ? "bg-orange/10" : "bg-white");
+/** 표 안에서 가로로 고정되는 셀 (이름 = left, 처리 = right) */
+export const STICKY_L = "sticky left-0 z-10";
+export const STICKY_R = "sticky right-0 z-10";
 
 /* ── 스테이 캘린더 계산 (문자열 비교 전에 normalizeDate로 통일) ── */
 export type DateRange = { start: string; end: string };

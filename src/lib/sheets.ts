@@ -1,5 +1,16 @@
 import { google } from "googleapis";
 import { RETREAT_SESSIONS } from "@/lib/retreat-sessions";
+import {
+  attachRowMeta,
+  mergeBookingRowsWithMeta,
+  refCellRange,
+  refRowRange,
+  type RowMeta,
+  type RowRef,
+  type SheetTab,
+} from "@/lib/row-ref";
+
+export type { RowMeta, RowRef, SheetTab } from "@/lib/row-ref";
 
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
 const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID!;
@@ -94,12 +105,14 @@ export async function appendBooking(row: BookingRow) {
   });
 }
 
-type FoundBookingRow = {
+type FoundRow = {
   sheets: ReturnType<typeof google.sheets>;
-  tabName: string;
+  tabName: SheetTab;
   rowNum: number;      // 1-based 시트 행 번호
-  values: string[];    // A~O 열
+  values: string[];
 };
+
+type FoundBookingRow = FoundRow & { tabName: "살롱" | "스테이" };
 
 /**
  * 예약 행 탐색 공통 로직.
@@ -136,13 +149,76 @@ async function findBookingRow(
   return null;
 }
 
+/* ─────────────────────────────────────────────
+   행 참조(ref) 경로 — 시트 행 번호로 직접 읽고 쓴다
+   (연락처·신청일시가 빈 수기 입력 행은 탐색으로 못 찾는다)
+───────────────────────────────────────────── */
+
+/** ref가 가리키는 한 줄을 읽는다. 빈 행·범위 밖이면 null. */
+export async function readRowByRef(ref: RowRef): Promise<FoundRow | null> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return null;
+
+  const auth = getAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+
+  const res = await sheets.spreadsheets.values
+    .get({ spreadsheetId: SPREADSHEET_ID, range: refRowRange(ref) })
+    .catch(() => ({ data: { values: [] as string[][] } }));
+
+  const values = ((res.data.values as string[][] | null) ?? [])[0];
+  if (!values || values.length === 0) return null;
+
+  return { sheets, tabName: ref.tab, rowNum: ref.rowNum, values };
+}
+
+/**
+ * ref가 가리키는 행의 한 칸(col)에 값을 쓴다.
+ * 이미 인증된 클라이언트가 있으면 넘겨서 토큰 재발급을 아낀다.
+ */
+export async function writeCellByRef(
+  ref: RowRef,
+  col: string,
+  value: string,
+  client?: ReturnType<typeof google.sheets>
+): Promise<boolean> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return false;
+
+  const sheets = client ?? google.sheets({ version: "v4", auth: getAuth() });
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: refCellRange(ref, col),
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: [[value]] },
+  });
+  return true;
+}
+
+/**
+ * ref가 있으면 행 번호로 직접, 없거나 그 행이 비어 있으면 기존 탐색(연락처)으로.
+ */
+async function resolveBookingRow(
+  type: string,
+  createdAt: string,
+  phone: string,
+  ref?: RowRef
+): Promise<FoundBookingRow | null> {
+  // 예약 탭(살롱·스테이)을 가리키는 ref만 직접 경로로 쓴다.
+  if (ref && (ref.tab === "살롱" || ref.tab === "스테이")) {
+    const byRef = await readRowByRef(ref);
+    if (byRef) return { ...byRef, tabName: ref.tab };
+  }
+  return findBookingRow(type, createdAt, phone);
+}
+
 /** 예약 행(A~O)을 그대로 반환. 현재 상태 확인용. */
 export async function getBookingRow(
   type: string,
   createdAt: string,
-  phone: string
+  phone: string,
+  ref?: RowRef
 ): Promise<string[] | null> {
-  const found = await findBookingRow(type, createdAt, phone);
+  const found = await resolveBookingRow(type, createdAt, phone, ref);
   return found ? found.values : null;
 }
 
@@ -153,18 +229,13 @@ export async function updateNotifyStatus(
   type: string,
   createdAt: string,
   phone: string,
-  status: string
+  status: string,
+  ref?: RowRef
 ): Promise<boolean> {
-  const found = await findBookingRow(type, createdAt, phone);
+  const found = await resolveBookingRow(type, createdAt, phone, ref);
   if (!found) return false;
 
-  await found.sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${found.tabName}!O${found.rowNum}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[status]] },
-  });
-  return true;
+  return writeCellByRef({ tab: found.tabName, rowNum: found.rowNum }, "O", status, found.sheets);
 }
 
 /** 예약 행의 '상태' 열(N)을 갱신. */
@@ -172,18 +243,13 @@ export async function updateBookingStatus(
   type: string,
   createdAt: string,
   phone: string,
-  status: string
+  status: string,
+  ref?: RowRef
 ): Promise<boolean> {
-  const found = await findBookingRow(type, createdAt, phone);
+  const found = await resolveBookingRow(type, createdAt, phone, ref);
   if (!found) return false;
 
-  await found.sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${found.tabName}!N${found.rowNum}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[status]] },
-  });
-  return true;
+  return writeCellByRef({ tab: found.tabName, rowNum: found.rowNum }, "N", status, found.sheets);
 }
 
 /**
@@ -194,22 +260,17 @@ export async function appendBookingMemo(
   type: string,
   createdAt: string,
   phone: string,
-  text: string
+  text: string,
+  ref?: RowRef
 ): Promise<boolean> {
   if (!text) return false;
-  const found = await findBookingRow(type, createdAt, phone);
+  const found = await resolveBookingRow(type, createdAt, phone, ref);
   if (!found) return false;
 
   const prev = (found.values[12] ?? "").trim();
   const next = prev ? `${prev}\n${text}` : text;
 
-  await found.sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${found.tabName}!M${found.rowNum}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[next]] },
-  });
-  return true;
+  return writeCellByRef({ tab: found.tabName, rowNum: found.rowNum }, "M", next, found.sheets);
 }
 
 /**
@@ -217,11 +278,12 @@ export async function appendBookingMemo(
  * 1순위 신청일시(A) + 연락처 정확 매칭, 2순위 연락처만으로 최신 행.
  */
 async function findSimpleRow(
+  tab: "리트릿" | "무료개방",
   range: string,
   phoneCol: number,
   createdAt: string,
   phone: string
-): Promise<{ sheets: ReturnType<typeof google.sheets>; rowNum: number; values: string[] } | null> {
+): Promise<FoundRow | null> {
   if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return null;
 
   const auth = getAuth();
@@ -237,12 +299,12 @@ async function findSimpleRow(
 
   for (let i = rows.length - 1; i >= 1; i--) {
     if (rows[i][0] === createdAt && strip(rows[i][phoneCol]) === target) {
-      return { sheets, rowNum: i + 1, values: rows[i] };
+      return { sheets, tabName: tab, rowNum: i + 1, values: rows[i] };
     }
   }
   for (let i = rows.length - 1; i >= 1; i--) {
     if (strip(rows[i][phoneCol]) === target) {
-      return { sheets, rowNum: i + 1, values: rows[i] };
+      return { sheets, tabName: tab, rowNum: i + 1, values: rows[i] };
     }
   }
   return null;
@@ -252,36 +314,30 @@ async function findSimpleRow(
 export async function updateRetreatStatus(
   createdAt: string,
   phone: string,
-  status: string
+  status: string,
+  ref?: RowRef
 ): Promise<boolean> {
-  const found = await findSimpleRow("리트릿!A:M", 2, createdAt, phone);
+  const found =
+    (ref?.tab === "리트릿" ? await readRowByRef(ref) : null) ??
+    (await findSimpleRow("리트릿", "리트릿!A:M", 2, createdAt, phone));
   if (!found) return false;
 
-  await found.sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `리트릿!M${found.rowNum}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[status]] },
-  });
-  return true;
+  return writeCellByRef({ tab: "리트릿", rowNum: found.rowNum }, "M", status, found.sheets);
 }
 
 /** 무료개방 행의 '상태' 열(L)을 갱신. */
 export async function updateOpenStayStatus(
   createdAt: string,
   phone: string,
-  status: string
+  status: string,
+  ref?: RowRef
 ): Promise<boolean> {
-  const found = await findSimpleRow("무료개방!A:L", 2, createdAt, phone);
+  const found =
+    (ref?.tab === "무료개방" ? await readRowByRef(ref) : null) ??
+    (await findSimpleRow("무료개방", "무료개방!A:L", 2, createdAt, phone));
   if (!found) return false;
 
-  await found.sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `무료개방!L${found.rowNum}`,
-    valueInputOption: "USER_ENTERED",
-    requestBody: { values: [[status]] },
-  });
-  return true;
+  return writeCellByRef({ tab: "무료개방", rowNum: found.rowNum }, "L", status, found.sheets);
 }
 
 /**
@@ -289,7 +345,15 @@ export async function updateOpenStayStatus(
  * 헤더는 첫 행 한 번만 포함
  */
 export async function getAllBookings(): Promise<string[][]> {
-  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return [];
+  return (await getAllBookingsWithMeta()).rows;
+}
+
+/**
+ * getAllBookings + 각 행의 출처 탭·시트 행 번호.
+ * meta는 rows와 **길이·순서가 같다** (meta[0]은 헤더 행).
+ */
+export async function getAllBookingsWithMeta(): Promise<{ rows: string[][]; meta: RowMeta[] }> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return { rows: [], meta: [] };
 
   const auth = getAuth();
   const sheets = google.sheets({ version: "v4", auth });
@@ -302,11 +366,7 @@ export async function getAllBookings(): Promise<string[][]> {
   const salonRows = (salonRes.data.values as string[][] | null) ?? [];
   const stayRows = (stayRes.data.values as string[][] | null) ?? [];
 
-  // 헤더는 한 번만, 각 탭의 데이터 행만 합치기
-  const header = salonRows[0] ?? stayRows[0] ?? BOOKING_HEADERS[0];
-  const data = [...salonRows.slice(1), ...stayRows.slice(1)];
-
-  return data.length > 0 ? [header, ...data] : [header];
+  return mergeBookingRowsWithMeta(salonRows, stayRows);
 }
 
 /* ─────────────────────────────────────────────
@@ -394,7 +454,12 @@ export async function appendRetreat(row: RetreatRow) {
 
 /** 리트릿 전체 신청 내역 (어드민용) */
 export async function getAllRetreats(): Promise<string[][]> {
-  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return [];
+  return (await getAllRetreatsWithMeta()).rows;
+}
+
+/** getAllRetreats + 시트 행 번호. meta는 rows와 길이·순서가 같다. */
+export async function getAllRetreatsWithMeta(): Promise<{ rows: string[][]; meta: RowMeta[] }> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return { rows: [], meta: [] };
   try {
     const auth = getAuth();
     const sheets = google.sheets({ version: "v4", auth });
@@ -402,9 +467,10 @@ export async function getAllRetreats(): Promise<string[][]> {
       spreadsheetId: SPREADSHEET_ID,
       range: "리트릿!A:M",
     });
-    return (res.data.values as string[][] | null) ?? [];
+    const rows = (res.data.values as string[][] | null) ?? [];
+    return { rows, meta: attachRowMeta(rows, "리트릿") };
   } catch {
-    return [];
+    return { rows: [], meta: [] };
   }
 }
 
@@ -505,7 +571,12 @@ export async function appendOpenStay(row: OpenStayRow) {
 }
 
 export async function getAllOpenStays(): Promise<string[][]> {
-  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return [];
+  return (await getAllOpenStaysWithMeta()).rows;
+}
+
+/** getAllOpenStays + 시트 행 번호. meta는 rows와 길이·순서가 같다. */
+export async function getAllOpenStaysWithMeta(): Promise<{ rows: string[][]; meta: RowMeta[] }> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return { rows: [], meta: [] };
   try {
     const auth = getAuth();
     const sheets = google.sheets({ version: "v4", auth });
@@ -513,8 +584,9 @@ export async function getAllOpenStays(): Promise<string[][]> {
       spreadsheetId: SPREADSHEET_ID,
       range: "무료개방!A:L",
     });
-    return (res.data.values as string[][] | null) ?? [];
-  } catch { return []; }
+    const rows = (res.data.values as string[][] | null) ?? [];
+    return { rows, meta: attachRowMeta(rows, "무료개방") };
+  } catch { return { rows: [], meta: [] }; }
 }
 
 export type BookingCheckResult = {

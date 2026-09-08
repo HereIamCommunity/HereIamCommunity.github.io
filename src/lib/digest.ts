@@ -112,9 +112,10 @@ export function buildDigest(
   const pending = rows
     .filter((r) => isPending(r[13] ?? ""))
     .sort((a, b) => {
-      const da = parseSheetDateTime(a[0])?.getTime() ?? 0;
-      const db = parseSheetDateTime(b[0])?.getTime() ?? 0;
-      return da - db;
+      // 신청일시를 못 읽는 행(시트 수기 입력)은 오래된 순 정렬에서 맨 뒤로 보낸다.
+      const da = parseSheetDateTime(a[0])?.getTime() ?? Number.POSITIVE_INFINITY;
+      const db = parseSheetDateTime(b[0])?.getTime() ?? Number.POSITIVE_INFINITY;
+      return da === db ? 0 : da - db;
     });
 
   const checkIns = rows.filter((r) => isStay(r) && normalizeDate(r[8]) === today && alive(r));

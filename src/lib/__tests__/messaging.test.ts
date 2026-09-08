@@ -30,3 +30,19 @@ describe("notifyStatusText — O열 기록 형식", () => {
     expect(text).toMatch(/^✅ \d{2}:\d{2} 취소 \(호스트 ❌\)$/);
   });
 });
+
+describe("notifyStatusText — 연락처 없는 행", () => {
+  it("건너뛴 사유가 있으면 괄호로 덧붙인다", () => {
+    const text = notifyStatusText("confirmed", {
+      guest: "skipped",
+      host: "ok",
+      guestSkipReason: "연락처 없음",
+    });
+    expect(text).toMatch(/^⏭ \d{2}:\d{2} 확정 건너뜀\(연락처 없음\)$/);
+  });
+
+  it("사유가 없으면 기존 문구 그대로", () => {
+    const text = notifyStatusText("received", { guest: "skipped", host: "ok" });
+    expect(text).toMatch(/^⏭ \d{2}:\d{2} 접수 건너뜀$/);
+  });
+});

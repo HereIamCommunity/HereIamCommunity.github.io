@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseAdminRow } from "@/lib/admin-row";
-import { resolveStatusAction } from "@/lib/admin-actions";
+import { parseStatusRequest, resolveStatusAction } from "@/lib/admin-actions";
 import { notifyBooking } from "@/lib/messaging";
+import type { RowRef } from "@/lib/row-ref";
 import {
   appendBookingMemo,
   getBookingRow,
@@ -13,8 +14,12 @@ import {
 /**
  * 어드민에서 신청 상태를 바꾼다 (입금확인 / 취소 / 되돌리기).
  *
- * body: { sheet?: "booking" | "retreat" | "open"; row: string[]; action: "confirm" | "cancel" | "reopen"; reason?: string }
+ * body: { sheet?: "booking" | "retreat" | "open"; row: string[]; action: "confirm" | "cancel" | "reopen";
+ *         reason?: string; ref?: { tab: "살롱"|"스테이"|"리트릿"|"무료개방"; rowNum: number } }
  * res:  { ok: true; status: string; notify?: NotifyResult } | { ok: false; error: string; status?: string }
+ *
+ * ref(목록 응답의 meta 원소)가 있으면 시트 행 번호로 직접 읽고 쓴다 — 연락처가 빈 행도 처리된다.
+ * 없으면 기존 방식(신청일시 + 연락처 탐색). 연락처는 더 이상 필수가 아니다.
  *
  * 알림(알림톡/문자)은 예약(booking)에서만 나간다. reopen은 어느 시트든 알림 없음.
  * 이미 같은 상태거나 허용되지 않는 전이면 409 (중복 클릭 방지).
@@ -27,42 +32,24 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const {
-      sheet = "booking",
-      row,
-      action,
-      reason,
-    } = (await req.json()) as {
-      sheet?: string;
-      row: string[];
-      action: string;
-      reason?: string;
-    };
-
-    if (!Array.isArray(row) || row.length === 0) {
-      return NextResponse.json({ ok: false, error: "신청 정보가 없습니다." }, { status: 400 });
+    const parsed = parseStatusRequest(await req.json());
+    if (!parsed.ok) {
+      return NextResponse.json(
+        { ok: false, error: parsed.error },
+        { status: parsed.httpStatus }
+      );
     }
-    // 시트를 읽기 전에 액션부터 거른다 (잘못된 요청에 시트 왕복 낭비 방지)
-    if (!["confirm", "cancel", "reopen"].includes(action)) {
-      return NextResponse.json({ ok: false, error: "알 수 없는 동작입니다." }, { status: 400 });
-    }
+    const { sheet, row, action, reason, ref } = parsed.value;
 
     if (sheet === "retreat" || sheet === "open") {
-      return handleSimpleSheet(sheet, row, action);
-    }
-    if (sheet !== "booking") {
-      return NextResponse.json({ ok: false, error: "알 수 없는 시트입니다." }, { status: 400 });
+      return handleSimpleSheet(sheet, row, action, ref);
     }
 
     /* ── 예약(살롱·스테이) ── */
-    if (!row[3]) {
-      return NextResponse.json({ ok: false, error: "예약 정보가 없습니다." }, { status: 400 });
-    }
-
     const booking = parseAdminRow(row);
 
     // 현재 시트 상태 확인 (중복 처리 방지)
-    const current = await getBookingRow(booking.type, booking.createdAt ?? "", booking.phone);
+    const current = await getBookingRow(booking.type, booking.createdAt ?? "", booking.phone, ref);
     if (!current) {
       return NextResponse.json(
         { ok: false, error: "시트에서 예약 행을 찾지 못했습니다." },
@@ -83,7 +70,8 @@ export async function POST(req: NextRequest) {
       booking.type,
       booking.createdAt ?? "",
       booking.phone,
-      resolved.status
+      resolved.status,
+      ref
     );
     if (!updated) {
       return NextResponse.json({ ok: false, error: "상태 저장에 실패했습니다." }, { status: 500 });
@@ -96,7 +84,8 @@ export async function POST(req: NextRequest) {
           booking.type,
           booking.createdAt ?? "",
           booking.phone,
-          `[취소사유] ${reason.trim()}`
+          `[취소사유] ${reason.trim()}`,
+          ref
         );
       } catch (e) {
         console.error("[STATUS] 취소 사유 기록 실패", e);
@@ -107,7 +96,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, status: resolved.status });
     }
 
-    const notify = await notifyBooking(resolved.event, booking);
+    // 연락처가 없으면 게스트 알림만 skipped(사유 "연락처 없음")이 되고 호스트 문자는 그대로 나간다.
+    const notify = await notifyBooking(resolved.event, booking, { ref });
     return NextResponse.json({ ok: true, status: resolved.status, notify });
   } catch (e) {
     console.error("[STATUS ERROR]", e);
@@ -117,12 +107,18 @@ export async function POST(req: NextRequest) {
 
 /**
  * 리트릿·무료개방: 알림 없이 상태만 바꾼다.
- * 행 식별은 신청일시(A) + 연락처(C). 상태 열은 리트릿 M(12), 무료개방 L(11).
+ * 행 식별은 ref(시트 행 번호) 우선, 없으면 신청일시(A) + 연락처(C).
+ * 상태 열은 리트릿 M(12), 무료개방 L(11).
  */
-async function handleSimpleSheet(sheet: "retreat" | "open", row: string[], action: string) {
+async function handleSimpleSheet(
+  sheet: "retreat" | "open",
+  row: string[],
+  action: string,
+  ref?: RowRef
+) {
   const createdAt = row[0] ?? "";
   const phone = row[2] ?? "";
-  if (!phone) {
+  if (!phone && !ref) {
     return NextResponse.json({ ok: false, error: "신청 정보가 없습니다." }, { status: 400 });
   }
 
@@ -139,8 +135,8 @@ async function handleSimpleSheet(sheet: "retreat" | "open", row: string[], actio
 
   const updated =
     sheet === "retreat"
-      ? await updateRetreatStatus(createdAt, phone, resolved.status)
-      : await updateOpenStayStatus(createdAt, phone, resolved.status);
+      ? await updateRetreatStatus(createdAt, phone, resolved.status, ref)
+      : await updateOpenStayStatus(createdAt, phone, resolved.status, ref);
 
   if (!updated) {
     return NextResponse.json(

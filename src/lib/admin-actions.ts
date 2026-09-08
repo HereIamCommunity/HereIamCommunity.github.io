@@ -7,6 +7,7 @@
 
 import type { BookingEvent } from "@/lib/kakao";
 import { isPending } from "@/lib/digest";
+import { normalizeRowRef, type RowRef } from "@/lib/row-ref";
 
 export type AdminSheet = "booking" | "retreat" | "open";
 export type AdminAction = "confirm" | "cancel" | "reopen";
@@ -72,4 +73,60 @@ export function resolveStatusAction(
   }
 
   return { ok: true, status: target.status, event: target.event };
+}
+
+/* ─── 요청 body 파싱 ────────────────────────────── */
+
+export type StatusRequest = {
+  sheet: AdminSheet;
+  row: string[];
+  action: AdminAction;
+  reason?: string;
+  /** 시트 행 번호로 직접 가리키는 참조. 없거나 형식이 틀리면 기존 탐색 경로. */
+  ref?: RowRef;
+};
+
+export type StatusRequestParse =
+  | { ok: true; value: StatusRequest }
+  | { ok: false; error: string; httpStatus: 400 };
+
+function isAdminAction(v: unknown): v is AdminAction {
+  return v === "confirm" || v === "cancel" || v === "reopen";
+}
+
+/**
+ * `/api/admin/status` body 검증 (순수 함수).
+ *
+ * 연락처(D열)는 **요구하지 않는다** — 시트에 손으로 넣어 연락처가 빈 행도
+ * 상태 변경은 되어야 하기 때문이다. 행을 못 찾는 것은 400이 아니라 404로 다룬다.
+ */
+export function parseStatusRequest(body: unknown): StatusRequestParse {
+  const b = (body ?? {}) as {
+    sheet?: unknown; row?: unknown; action?: unknown; reason?: unknown; ref?: unknown;
+  };
+
+  if (!Array.isArray(b.row) || b.row.length === 0) {
+    return { ok: false, error: "신청 정보가 없습니다.", httpStatus: 400 };
+  }
+  // 시트를 읽기 전에 액션부터 거른다 (잘못된 요청에 시트 왕복 낭비 방지)
+  if (!isAdminAction(b.action)) {
+    return { ok: false, error: "알 수 없는 동작입니다.", httpStatus: 400 };
+  }
+  const sheet = b.sheet === undefined ? "booking" : b.sheet;
+  if (typeof sheet !== "string" || !isAdminSheet(sheet)) {
+    return { ok: false, error: "알 수 없는 시트입니다.", httpStatus: 400 };
+  }
+
+  const ref = normalizeRowRef(b.ref);
+
+  return {
+    ok: true,
+    value: {
+      sheet,
+      row: (b.row as unknown[]).map((c) => (c == null ? "" : String(c))),
+      action: b.action,
+      reason: typeof b.reason === "string" ? b.reason : undefined,
+      ...(ref ? { ref } : {}),
+    },
+  };
 }
