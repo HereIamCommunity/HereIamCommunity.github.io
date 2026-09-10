@@ -201,3 +201,31 @@ describe("buildSimpleBlocks", () => {
     expect(m.text).toContain("이름: 박무료");
   });
 });
+
+describe("mrkdwn 이스케이프 — 자유 입력의 & < > 가 링크/엔티티로 오파싱되지 않는다", () => {
+  const nasty: Booking = {
+    type: "salon", name: "김<철수> & Co", phone: "010-0000-0000",
+    program: "A<B> & C", date: "9월 12일 (금) 20:00", totalAmount: 20000, via: "web",
+  };
+  it("section fields 값은 이스케이프, 문자 fallback(text)은 원문", () => {
+    const m = buildHostBlocks("received", nasty, { guestResult: "ok" });
+    const section = m.blocks.find((b) => b.type === "section") as { fields: { text: string }[] };
+    const texts = section.fields.map((f) => f.text).join("\n");
+    expect(texts).toContain("김&lt;철수&gt; &amp; Co");
+    expect(texts).toContain("A&lt;B&gt; &amp; C");
+    expect(texts).not.toMatch(/<철수>/);
+    expect(m.text).toContain("김<철수> & Co");
+  });
+  it("게스트 실패 사유는 이스케이프되고 굵게 래퍼는 유지", () => {
+    const m = buildHostBlocks("confirmed", nasty, { guestResult: { error: "1042 <no template> & fail." } });
+    const ctx = m.blocks.find((b) => b.type === "context") as { elements: { text: string }[] };
+    expect(ctx.elements[0].text).toBe("*⚠ 게스트 알림 실패 — 1042 &lt;no template&gt; &amp; fail · 어드민에서 재발송*");
+  });
+  it("buildSimpleBlocks의 fields·note도 이스케이프", () => {
+    const m = buildSimpleBlocks("🏕 리트릿 신청", [{ label: "이름", value: "a<b>&c" }], "조건: 사용일 < 2026-09-10");
+    const section = m.blocks.find((b) => b.type === "section") as { fields: { text: string }[] };
+    const ctx = m.blocks.find((b) => b.type === "context") as { elements: { text: string }[] };
+    expect(section.fields[0].text).toBe("*이름*\na&lt;b&gt;&amp;c");
+    expect(ctx.elements[0].text).toBe("조건: 사용일 &lt; 2026-09-10");
+  });
+});

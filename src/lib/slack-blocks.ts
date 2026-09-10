@@ -32,6 +32,15 @@ const EVENT_EMOJI: Record<BookingEvent, string> = {
 
 export type SlackField = { label: string; value: string };
 
+/**
+ * 슬랙 mrkdwn 이스케이프. 시트에서 온 자유 입력(이름·프로그램·사유)에 `&`·`<`·`>`가 있으면
+ * 슬랙이 링크/엔티티로 파싱해 깨진다 (api.slack.com/reference/surfaces/formatting#escaping).
+ * 문자 대체본(`text`)에는 적용하지 않는다 — 그건 문자로 나가는 원문이다.
+ */
+export function escapeMrkdwn(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 function header(text: string): SlackBlock {
   return { type: "header", text: { type: "plain_text", text, emoji: true } };
 }
@@ -40,7 +49,7 @@ function fieldSection(fields: SlackField[]): SlackBlock {
   return {
     type: "section",
     // 슬랙 section fields는 최대 10개다. 넘치면 잘라 보낸다(발송 자체가 막히지 않도록).
-    fields: fields.slice(0, 10).map((f) => ({ type: "mrkdwn", text: `*${f.label}*\n${f.value}` })),
+    fields: fields.slice(0, 10).map((f) => ({ type: "mrkdwn", text: `*${escapeMrkdwn(f.label)}*\n${escapeMrkdwn(f.value)}` })),
   };
 }
 
@@ -95,9 +104,9 @@ function guestLine(ctx: HostContext): string | null {
   if (guest === undefined) return null;
   if (guest === "ok") return "게스트에게 안내 알림톡을 보냈어요.";
   if (guest === "skipped") {
-    return `게스트 알림은 아직 발송되지 않았어요 (${ctx.guestSkipReason ?? "템플릿 미설정"}).`;
+    return `게스트 알림은 아직 발송되지 않았어요 (${escapeMrkdwn(ctx.guestSkipReason ?? "템플릿 미설정")}).`;
   }
-  return `*⚠ 게스트 알림 실패 — ${guest.error.replace(/\.$/, "")} · 어드민에서 재발송*`;
+  return `*⚠ 게스트 알림 실패 — ${escapeMrkdwn(guest.error.replace(/\.$/, ""))} · 어드민에서 재발송*`;
 }
 
 /** 호스트가 다음에 할 일. 확정 건은 할 일이 없다. */
@@ -140,7 +149,7 @@ export function buildSimpleBlocks(
   const blocks: SlackBlock[] = [
     header(title),
     fieldSection(fields),
-    ...(note ? [context([note])] : []),
+    ...(note ? [context([escapeMrkdwn(note)])] : []),
   ];
 
   const text = [title, ...fields.map((f) => `${f.label}: ${f.value}`), ...(note ? [note] : [])].join(
