@@ -46,3 +46,10 @@ describe("notifyStatusText — 연락처 없는 행", () => {
     expect(text).toMatch(/^⏭ \d{2}:\d{2} 접수 건너뜀$/);
   });
 });
+
+describe("notifyStatusText — 지난 예약", () => {
+  it("guestSkipReason '지난 예약'이 O열에 그대로", () => {
+    const t = notifyStatusText("confirmed", { guest: "skipped", host: "ok", guestSkipReason: "지난 예약" });
+    expect(t).toMatch(/^⏭ \d{2}:\d{2} 확정 건너뜀\(지난 예약\)$/);
+  });
+});

@@ -29,7 +29,7 @@ import {
 /** key는 aria-controls/id용 (라벨에 공백이 있어 IDREF로 못 쓴다) */
 export const TABS = [
   { key: "today", label: "오늘" },
-  { key: "list", label: "목록" },
+  { key: "list", label: "신청 리스트" },
   { key: "stats", label: "통계" },
   { key: "stay", label: "스테이 캘린더" },
   { key: "retreat", label: "리트릿" },
@@ -308,9 +308,9 @@ export default function AdminShell({
         {tab === "today" && (
           <TodayTab
             digest={digest}
-            actions={actions}
             conflicts={conflicts}
             onGoCalendar={() => setTab("stay")}
+            onGoPending={() => openList("입금대기")}
           />
         )}
         {tab === "list" && (

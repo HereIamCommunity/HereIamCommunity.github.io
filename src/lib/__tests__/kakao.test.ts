@@ -415,3 +415,10 @@ describe("연락처 없는 행", () => {
     expect(text).not.toContain("템플릿 미설정");
   });
 });
+
+describe("planMessages + 지난 예약 — buildHostMessage 사유 문구", () => {
+  it("호스트 문자에 '지난 예약' 사유가 실린다", () => {
+    const t = buildHostMessage("confirmed", { ...salon, via: "admin" }, { guestResult: "skipped", guestSkipReason: "지난 예약", at: new Date("2026-09-10T10:00:00+09:00") }).text;
+    expect(t).toContain("게스트 알림은 아직 발송되지 않았어요 (지난 예약).");
+  });
+});

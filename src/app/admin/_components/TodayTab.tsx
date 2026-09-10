@@ -1,10 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
 import { ageDays, type Digest } from "@/lib/digest";
 import Banner from "./Banner";
-import BookingDrawer from "./BookingDrawer";
-import BookingList from "./BookingList";
 import StatusBadge from "./StatusBadge";
 import SummaryCard from "./SummaryCard";
 import {
@@ -85,19 +82,18 @@ function Section({
 /** 오늘 탭 — 로그인 직후 오늘 할 일을 보고 이 화면에서 처리까지 끝낸다 */
 export default function TodayTab({
   digest,
-  actions,
   conflicts,
   onGoCalendar,
+  onGoPending,
 }: {
   digest: Digest;
-  actions: AdminActions;
   conflicts: { room: string; date: string }[];
   onGoCalendar: () => void;
+  /** 입금대기 카드·배너 → 신청 리스트 탭(입금대기 필터) */
+  onGoPending: () => void;
 }) {
   const pending = digest.pending;
   const oldest = pending.length > 0 ? ageDays(pending[0][0]) : 0;
-  const [selected, setSelected] = useState<Row | null>(null);
-  const closeDrawer = useCallback(() => setSelected(null), []);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -109,8 +105,8 @@ export default function TodayTab({
         <Banner
           tone="warn"
           title={`입금대기 ${pending.length}건 · 가장 오래된 건 ${oldest}일 경과`}
-          detail="입금이 확인되면 [입금확인]을 눌러주세요. 게스트에게 확정 알림톡이 나갑니다."
-          action={{ label: "처리하러 가기", onClick: () => scrollTo("today-pending") }}
+          detail="신청 리스트에서 입금확인을 눌러주세요. 게스트에게 확정 알림톡이 나갑니다."
+          action={{ label: "처리하러 가기", onClick: onGoPending }}
         />
       ) : (
         <Banner
@@ -141,7 +137,7 @@ export default function TodayTab({
           label="입금대기"
           value={`${pending.length}건`}
           tone="orange"
-          onClick={() => scrollTo("today-pending")}
+          onClick={onGoPending}
         />
         <SummaryCard
           label="오늘 체크인"
@@ -162,15 +158,6 @@ export default function TodayTab({
           onClick={() => scrollTo("today-salon")}
         />
       </div>
-
-      <Section
-        id="today-pending"
-        title="입금대기 (오래된 순)"
-        count={pending.length}
-        empty="입금대기 건이 없어요."
-      >
-        <BookingList rows={pending} actions={actions} onSelect={setSelected} />
-      </Section>
 
       <Section id="today-checkin" title="오늘 체크인" count={digest.checkIns.length} empty="오늘 들어오는 손님이 없어요.">
         <ul className={CARD_FLUSH}>
@@ -214,7 +201,6 @@ export default function TodayTab({
         </ul>
       </Section>
 
-      <BookingDrawer row={selected} actions={actions} onClose={closeDrawer} />
     </div>
   );
 }

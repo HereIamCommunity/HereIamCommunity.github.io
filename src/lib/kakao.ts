@@ -22,6 +22,7 @@
  */
 
 import { SolapiMessageService } from "solapi";
+import { isPastBooking } from "@/lib/past-booking";
 
 const ADMIN_URL = "koinonia-web.vercel.app/admin";
 
@@ -370,7 +371,9 @@ export async function sendBookingMessages(
   }
 
   const from = stripPhone(process.env.SOLAPI_SENDER_PHONE!);
-  const guestTo = opts.hostOnly ? "" : stripPhone(booking.phone);
+  // 사용일이 컷오프(2026-09-10) 이전인 지난 예약은 게스트에게 보내지 않는다 (운영 요청).
+  const past = !opts.hostOnly && isPastBooking(booking);
+  const guestTo = opts.hostOnly || past ? "" : stripPhone(booking.phone);
   let hostTo = stripPhone(process.env.OPERATOR_PHONE ?? "");
   // 게스트와 호스트가 같은 번호면 솔라피가 중복 수신번호(1026)로 실패 처리하므로 호스트 사본은 건너뛴다.
   if (guestTo && hostTo === guestTo) hostTo = "";
@@ -388,7 +391,7 @@ export async function sendBookingMessages(
     guest = r.result;
     groupId = r.groupId;
   } else if (!opts.hostOnly) {
-    guestSkipReason = guestTo ? "템플릿 미설정" : "연락처 없음";
+    guestSkipReason = past ? "지난 예약" : guestTo ? "템플릿 미설정" : "연락처 없음";
     console.warn(`[NOTIFY] ${guestSkipReason} — ${event} 게스트 발송 건너뜀`);
   }
 

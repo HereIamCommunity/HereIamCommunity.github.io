@@ -201,7 +201,7 @@ function BookingRow({
   );
 }
 
-/** 예약 목록 — 목록 탭·오늘 탭 입금대기 섹션이 같은 컴포넌트를 쓴다 */
+/** 예약 목록 — 신청 리스트 탭이 쓴다 */
 export default function BookingList({
   rows,
   actions,
