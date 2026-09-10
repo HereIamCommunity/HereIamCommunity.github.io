@@ -24,8 +24,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "jobId가 없습니다." }, { status: 400 });
   }
 
+  // 읽기 실패와 "기록 없음"을 구분한다. 시트 오류를 404로 보여주면 운영자가
+  // 되돌리기를 포기하고 재실행하는 최악의 경로로 간다.
+  let entry: Awaited<ReturnType<typeof findBulkLog>>;
   try {
-    const entry = await findBulkLog(jobId);
+    entry = await findBulkLog(jobId);
+  } catch (e) {
+    console.error("[BULK REVERT] 로그 읽기 실패", e);
+    return NextResponse.json(
+      { ok: false, error: "실행 기록을 읽지 못했습니다(시트 오류). 잠시 후 다시 시도해주세요." },
+      { status: 500 }
+    );
+  }
+
+  try {
     if (!entry) {
       return NextResponse.json(
         { ok: false, error: "일괄 처리 기록을 찾지 못했습니다." },

@@ -3,6 +3,7 @@ import { resolveStatusAction } from "@/lib/admin-actions";
 import { parseAdminRow } from "@/lib/admin-row";
 import {
   bulkJobId,
+  canApplyBulkWrites,
   parseBulkRequest,
   planBulkWrites,
   selectBulkTargets,
@@ -47,6 +48,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   try {
+    // readBulkLog는 탭이 아직 없을 때만 빈 배열을 준다. 권한·쿼터 오류는 던져서 500으로 드러난다
+    // — 읽기 실패를 "기록 없음"으로 보여주면 운영자가 되돌리기 대상을 놓친다.
     const jobs = (await readBulkLog(20)).map((e) => ({
       jobId: e.jobId,
       at: e.at,
@@ -58,8 +61,11 @@ export async function GET(req: NextRequest) {
     }));
     return NextResponse.json({ ok: true, jobs });
   } catch (e) {
-    console.error("[BULK GET]", e);
-    return NextResponse.json({ ok: false, error: String(e) }, { status: 500 });
+    console.error("[BULK GET] 로그 읽기 실패", e);
+    return NextResponse.json(
+      { ok: false, error: "실행 기록을 읽지 못했습니다(시트 오류)." },
+      { status: 500 }
+    );
   }
 }
 
@@ -120,7 +126,9 @@ export async function POST(req: NextRequest) {
     const plan = planBulkWrites(targets, action, notify, now);
     const at = kstTimestamp(now);
 
-    // 스냅샷을 먼저 남긴다 — 쓰기가 중간에 실패해도 되돌릴 원값이 남아 있어야 한다.
+    // 스냅샷을 먼저 남긴다 — 되돌리기의 유일한 근거다.
+    // 로그가 안 남으면 **아무것도 쓰지 않고 중단**한다. 여기서 그냥 진행하면
+    // 최대 500행이 되돌릴 수 없는 상태가 된다.
     let logged = false;
     if (plan.applied.length > 0) {
       try {
@@ -133,6 +141,15 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.error("[BULK] 로그 기록 실패", e);
       }
+    }
+
+    const gate = canApplyBulkWrites(plan.applied.length, logged);
+    if (!gate.ok) {
+      console.error(`[BULK] 로그를 남기지 못해 중단 job=${jobId} applied=${plan.applied.length}`);
+      return NextResponse.json(
+        { ok: false, error: gate.error, jobId, count: targets.length },
+        { status: gate.httpStatus }
+      );
     }
 
     // 쓰기 1회

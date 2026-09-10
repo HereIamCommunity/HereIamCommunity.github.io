@@ -265,6 +265,27 @@ export function parseBulkRequest(body: unknown): BulkRequestParse {
   };
 }
 
+/* ─── 실행 안전장치 ────────────────────────────── */
+
+export const BULK_LOG_REQUIRED_ERROR =
+  "실행 기록을 남기지 못해 중단했습니다. 시트 접근 권한/쿼터를 확인하세요.";
+
+/**
+ * batchUpdate를 진행해도 되는지 (순수 판정).
+ *
+ * 되돌리기의 **유일한** 근거가 `_bulk_log`의 스냅샷이다. 로그가 안 남았는데 상태를 바꾸면
+ * 최대 500행이 되돌릴 수 없는 상태가 된다 — 그래서 쓰기 **전에** 막는다.
+ * 적용할 행이 0건이면 바꿀 것도 없으므로 로그 없이 통과.
+ */
+export function canApplyBulkWrites(
+  appliedCount: number,
+  logged: boolean
+): { ok: true } | { ok: false; error: string; httpStatus: 500 } {
+  if (appliedCount === 0) return { ok: true };
+  if (!logged) return { ok: false, error: BULK_LOG_REQUIRED_ERROR, httpStatus: 500 };
+  return { ok: true };
+}
+
 /** 조건을 사람이 읽는 한 줄로 — 로그·목록 표시용. */
 export function summarizeBulkFilter(filter: BulkFilter, action: BulkAction): string {
   const STATUS: Record<BulkStatusFilter, string> = {

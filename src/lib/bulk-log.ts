@@ -15,6 +15,7 @@ import {
   appendSheetRow,
   batchUpdateCells,
   ensureSheetTab,
+  isMissingRangeError,
   readSheetRange,
 } from "@/lib/sheets";
 
@@ -135,9 +136,23 @@ export async function appendBulkLog(entry: BulkLogInput): Promise<boolean> {
   return appendSheetRow(BULK_LOG_TAB, toLogRow(entry));
 }
 
-/** 최근 실행 기록 (최신순). 탭이 없으면 빈 배열. */
+/**
+ * 로그 탭 전체를 읽는다. **아직 탭이 없을 때만** 빈 배열,
+ * 권한·쿼터 등 진짜 오류는 그대로 던진다 — 읽기 실패가 "기록 없음"으로 위장되면
+ * 되돌리기가 404 오답을 내고 운영자가 재실행할 수 있다.
+ */
+async function readLogRows(): Promise<string[][]> {
+  try {
+    return await readSheetRange(`${a1Tab(BULK_LOG_TAB)}!A:H`);
+  } catch (e) {
+    if (isMissingRangeError(e)) return [];
+    throw e;
+  }
+}
+
+/** 최근 실행 기록 (최신순). 탭이 없으면 빈 배열, 읽기 실패는 throw. */
 export async function readBulkLog(limit = 20): Promise<BulkLogEntry[]> {
-  const rows = await readSheetRange(`${a1Tab(BULK_LOG_TAB)}!A:H`);
+  const rows = await readLogRows();
   const entries: BulkLogEntry[] = [];
   for (let i = rows.length - 1; i >= 0 && entries.length < limit; i--) {
     const e = parseLogRow(rows[i] ?? [], i + 1);
@@ -148,7 +163,7 @@ export async function readBulkLog(limit = 20): Promise<BulkLogEntry[]> {
 
 /** jobId로 로그 한 줄 찾기 (같은 jobId가 여럿이면 가장 최근 것). */
 export async function findBulkLog(jobId: string): Promise<BulkLogEntry | null> {
-  const rows = await readSheetRange(`${a1Tab(BULK_LOG_TAB)}!A:H`);
+  const rows = await readLogRows();
   for (let i = rows.length - 1; i >= 0; i--) {
     const e = parseLogRow(rows[i] ?? [], i + 1);
     if (e && e.jobId === jobId) return e;

@@ -706,13 +706,40 @@ export async function appendSheetRow(name: string, values: string[]): Promise<bo
   return true;
 }
 
-/** 범위를 읽어 행 배열로. 자격증명이 없거나 탭이 없으면 빈 배열. */
+/**
+ * 없는 탭·범위를 가리켜서 난 400인지 (순수 판정).
+ *
+ * 권한·쿼터 오류를 "빈 결과"로 삼키면 호출부가 "기록 없음"으로 오해한다
+ * (되돌리기 404 오답 → 운영자가 재실행할 위험). 조용히 넘겨도 되는 건 이 경우뿐이다.
+ */
+export function isMissingRangeError(e: unknown): boolean {
+  if (!e || typeof e !== "object") return false;
+  const err = e as {
+    status?: unknown; code?: unknown; message?: unknown;
+    errors?: { message?: string }[];
+    response?: { data?: { error?: { code?: number; message?: string } } };
+  };
+  const status = Number(err.status ?? err.code ?? err.response?.data?.error?.code ?? 0);
+  if (status !== 400 && status !== 404) return false;
+  const msg = [
+    String(err.message ?? ""),
+    err.response?.data?.error?.message ?? "",
+    ...(err.errors ?? []).map((x) => x?.message ?? ""),
+  ].join(" ");
+  return /Unable to parse range/i.test(msg);
+}
+
+/**
+ * 범위를 읽어 행 배열로. 자격증명이 없으면 빈 배열.
+ *
+ * **시트 오류는 그대로 던진다** — 읽기 실패를 빈 결과로 위장하지 않는다
+ * (`readRowByRef`와 같은 원칙: 429가 404로 보여 원인 파악이 늦어진 사례, 2026-09-10).
+ * "탭이 아직 없음"만 조용히 넘기고 싶은 호출부는 `isMissingRangeError`로 걸러라.
+ */
 export async function readSheetRange(range: string): Promise<string[][]> {
   if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return [];
   const sheets = google.sheets({ version: "v4", auth: getAuth() });
-  const res = await sheets.spreadsheets.values
-    .get({ spreadsheetId: SPREADSHEET_ID, range })
-    .catch(() => ({ data: { values: [] } }));
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range });
   return (res.data.values as string[][] | null) ?? [];
 }
 

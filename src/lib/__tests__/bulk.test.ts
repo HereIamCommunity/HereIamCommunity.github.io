@@ -5,6 +5,7 @@ import {
   planBulkWrites,
   planRevertWrites,
   parseBulkRequest,
+  canApplyBulkWrites,
   type BulkFilter,
 } from "@/lib/bulk";
 import type { RowMeta } from "@/lib/row-ref";
@@ -256,5 +257,22 @@ describe("parseBulkRequest", () => {
   it("body가 아예 없으면 400", () => {
     expect(parseBulkRequest(undefined).ok).toBe(false);
     expect(parseBulkRequest({}).ok).toBe(false);
+  });
+});
+
+describe("canApplyBulkWrites", () => {
+  it("적용할 행이 있는데 로그가 안 남았으면 쓰기를 막는다 (되돌릴 근거가 없으므로)", () => {
+    const g = canApplyBulkWrites(88, false);
+    expect(g.ok).toBe(false);
+    expect(!g.ok && g.httpStatus).toBe(500);
+    expect(!g.ok && g.error).toContain("실행 기록을 남기지 못해 중단했습니다");
+  });
+
+  it("로그가 남았으면 진행", () => {
+    expect(canApplyBulkWrites(88, true)).toEqual({ ok: true });
+  });
+
+  it("적용할 행이 0건이면 로그 없이도 진행 (바꿀 게 없다)", () => {
+    expect(canApplyBulkWrites(0, false)).toEqual({ ok: true });
   });
 });
