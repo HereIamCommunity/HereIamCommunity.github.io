@@ -660,6 +660,62 @@ export async function initSheetHeaders() {
   });
 }
 
+/* ─────────────────────────────────────────────
+   범용 탭 헬퍼 (일괄 처리 로그 `_bulk_log` 등)
+───────────────────────────────────────────── */
+
+/** A1 표기의 탭 이름 인용 — 밑줄로 시작하는 이름(`_bulk_log`)도 안전하게. */
+export function a1Tab(name: string): string {
+  return `'${name.replace(/'/g, "''")}'`;
+}
+
+/**
+ * 탭이 없으면 만들고 1행에 헤더를 쓴다. 이미 있으면 아무것도 하지 않는다.
+ * 반환: 시트를 쓸 수 있는 환경인지(자격증명 없으면 false).
+ */
+export async function ensureSheetTab(name: string, header: string[]): Promise<boolean> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return false;
+  const sheets = google.sheets({ version: "v4", auth: getAuth() });
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+  if (meta.data.sheets?.some((s) => s.properties?.title === name)) return true;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    requestBody: { requests: [{ addSheet: { properties: { title: name } } }] },
+  });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${a1Tab(name)}!A1`,
+    valueInputOption: "RAW",
+    requestBody: { values: [header] },
+  });
+  return true;
+}
+
+/** 탭 맨 끝에 한 줄 추가. 반환: 실제로 추가됐는지. */
+export async function appendSheetRow(name: string, values: string[]): Promise<boolean> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return false;
+  const sheets = google.sheets({ version: "v4", auth: getAuth() });
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${a1Tab(name)}!A:A`,
+    valueInputOption: "RAW",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: { values: [values] },
+  });
+  return true;
+}
+
+/** 범위를 읽어 행 배열로. 자격증명이 없거나 탭이 없으면 빈 배열. */
+export async function readSheetRange(range: string): Promise<string[][]> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return [];
+  const sheets = google.sheets({ version: "v4", auth: getAuth() });
+  const res = await sheets.spreadsheets.values
+    .get({ spreadsheetId: SPREADSHEET_ID, range })
+    .catch(() => ({ data: { values: [] } }));
+  return (res.data.values as string[][] | null) ?? [];
+}
+
 /** 여러 셀을 한 번의 요청으로 쓴다 (values.batchUpdate). 반환: 갱신된 셀 수. */
 export async function batchUpdateCells(data: { range: string; values: string[][] }[]): Promise<number> {
   if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return 0;
