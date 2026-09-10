@@ -241,3 +241,34 @@ export function buildStats(bookings: string[][], now?: Date): Stats; // 헤더 �
 
 ### AC
 typecheck/test/eslint/build + preview 페이지에서 패널 열고 미리보기(가짜 API)·실행·되돌리기 흐름 동작 + 스크린샷 390/1280.
+
+## 8. 관리자 알림 → 슬랙 봇 (2026-09-10 운영 요청)
+
+호스트에게 가던 문자를 슬랙 채널 알림으로 바꾼다. Bot Token(`chat.postMessage`) 방식. 슬랙 발송 실패 시에만 문자로 대체.
+
+### 환경변수
+- `SLACK_BOT_TOKEN` (xoxb-…), `SLACK_CHANNEL_ID` (C0…). 둘 중 하나라도 없으면 슬랙 건너뛰고 **기존 문자 경로 유지**(배포 순서 자유).
+- 슬랙 앱 준비(사람): api.slack.com/apps → Create New App(From scratch) → OAuth & Permissions → Bot Token Scopes `chat:write` → Install to Workspace → Bot User OAuth Token 복사 → 알림 받을 채널에서 `/invite @봇이름` → 채널 ID(채널 상세 하단) 복사.
+
+### 이벤트 (전부)
+| 이벤트 | 출처 | 메시지 |
+|---|---|---|
+| 새 신청 (살롱/스테이) | `/api/booking` | 🆕 누가·언제·무엇 + 금액·입금 대기 + 게스트 알림 결과 |
+| 입금확인 (어드민) | `/api/admin/status` | ✅ |
+| 카드결제 확정 | `/api/payment/confirm` | 💳 |
+| 취소 | `/api/admin/status` | ❌ + 환불 안내 |
+| 일괄 처리 실행/되돌리기 | `/api/admin/bulk` | 📦 조건 요약 · N건 · 실행자 없음(어드민) |
+| 리트릿 신청 / 무료개방 신청 | `/api/retreat`, `/api/open-stay` | 🏕 / 🚪 |
+| 게스트 알림 실패 | 모든 이벤트 | ⚠ 위 메시지 안에 "게스트 알림 실패 — 사유 · 어드민에서 재발송" 강조 |
+
+### 구현 (Max)
+- `src/lib/slack.ts`: `postSlack(blocks, fallbackText)` — `fetch("https://slack.com/api/chat.postMessage")`, 5초 타임아웃, `{ ok, ts?, error? }`. 라이브러리 추가 없음.
+- `src/lib/host-notify.ts`: `notifyHost(event, booking, ctx)` — 슬랙 우선 → 실패·미설정이면 `buildHostMessage` 문자. `sendBookingMessages`의 호스트 분기가 이걸 호출하도록 교체(게스트 경로 불변). 결과 `host: "ok" | "skipped" | {error}` + `hostChannel: "slack" | "sms"`.
+- Block Kit 순수 빌더 `buildHostBlocks(event, booking, ctx)` (테스트): header(이모지+이벤트·구분), section fields(이름·연락처(tel 링크 없음, 텍스트)·내용·일시·금액), context(게스트 알림 결과), actions(어드민 열기 버튼 URL `https://koinonia-web.vercel.app/admin?tab=list`). `fallbackText`는 기존 `buildHostMessage().text`.
+- 리트릿·무료개방·일괄 처리용 `buildSimpleBlocks(title, fields, note?)`.
+- O열 기록·`NotifyResult`에 `hostChannel` 추가. 어드민 토스트 문구 "호스트 슬랙 알림 보냄"/"슬랙 실패 → 문자 대체".
+- `GET /api/admin/notify-test`에 `slack: { configured, channel }` 추가, `POST /api/admin/notify-test` body `{ target: "slack" }`이면 슬랙 테스트 메시지 1건.
+- 테스트: 블록 빌더(필드·이벤트별 이모지·게스트 실패 강조), `notifyHost` 분기(슬랙 ok / 슬랙 실패→문자 / 미설정→문자) — fetch 모킹.
+
+### 화면 (Esther) — 설정 탭
+- "슬랙 알림" 카드: 설정 여부(토큰·채널) 체크리스트, [슬랙 테스트 보내기] 버튼(확인 단계 없음, 요금 없음), 안내 문구 "슬랙 미설정 시 호스트 문자로 나갑니다".
