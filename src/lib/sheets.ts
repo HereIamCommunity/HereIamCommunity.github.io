@@ -161,9 +161,9 @@ export async function readRowByRef(ref: RowRef): Promise<FoundRow | null> {
   const auth = getAuth();
   const sheets = google.sheets({ version: "v4", auth });
 
-  const res = await sheets.spreadsheets.values
-    .get({ spreadsheetId: SPREADSHEET_ID, range: refRowRange(ref) })
-    .catch(() => ({ data: { values: [] as string[][] } }));
+  // 시트 API 오류(쿼터 초과 등)를 "행 없음"으로 위장하지 않는다 — 그대로 던져 500으로 드러낸다.
+  // 일괄 처리 중 429가 404로 보여 원인 파악이 늦어진 사례(2026-09-10).
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: refRowRange(ref) });
 
   const values = ((res.data.values as string[][] | null) ?? [])[0];
   if (!values || values.length === 0) return null;
