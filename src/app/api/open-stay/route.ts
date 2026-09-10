@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appendOpenStay } from "@/lib/sheets";
 import { Resend } from "resend";
+import { postSlack } from "@/lib/slack";
+import { buildSimpleBlocks } from "@/lib/slack-blocks";
 
 const OPERATOR_EMAIL = process.env.OPERATOR_EMAIL ?? "hereiam.community@gmail.com";
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "코이노니아 <onboarding@resend.dev>";
@@ -31,12 +33,32 @@ export async function POST(req: NextRequest) {
       status: "신청",
     });
 
+    const contributionLabel = Array.isArray(contribution) ? contribution.join(" · ") : contribution;
+    const groupLabel = GROUP_LABELS[groupType] ?? groupType;
+    const groupDisplay = groupType === "solo" ? "혼자 (1명)" : `${groupLabel} · ${groupSize || "?"}명`;
+
+    // 운영자 슬랙 알림 — 실패해도 신청 처리는 그대로 끝낸다.
+    try {
+      await postSlack(
+        buildSimpleBlocks(
+          "🚪 무료개방 신청",
+          [
+            { label: "이름", value: name },
+            { label: "연락처", value: phone },
+            { label: "방문 형태", value: groupDisplay },
+            { label: "일정", value: `${checkIn} ~ ${checkOut}` },
+            { label: "기여 방법", value: contributionLabel || "-" },
+          ],
+          "어드민 무료개방 탭에서 확인해주세요."
+        )
+      );
+    } catch (e) {
+      console.warn("[OPEN-STAY] 슬랙 알림 실패:", e);
+    }
+
     // 운영자 알림
     const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
     if (resend) {
-      const contributionLabel = Array.isArray(contribution) ? contribution.join(" · ") : contribution;
-      const groupLabel = GROUP_LABELS[groupType] ?? groupType;
-      const groupDisplay = groupType === "solo" ? "혼자 (1명)" : `${groupLabel} · ${groupSize || "?"}명`;
       const html = `
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
           <div style="background:#372a14;color:white;padding:20px 24px;border-radius:12px 12px 0 0">

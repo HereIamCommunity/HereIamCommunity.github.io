@@ -373,7 +373,15 @@ describe("호스트 문자 — 누가·언제·무엇을·어떤 액션", () => 
 
 /* ─── 연락처 없는 행 (시트 수기 입력) ───────────── */
 describe("연락처 없는 행", () => {
-  const SOLAPI_KEYS = ["SOLAPI_API_KEY", "SOLAPI_API_SECRET", "SOLAPI_SENDER_PHONE", "OPERATOR_PHONE"];
+  // 슬랙 키까지 지운다 — 설정돼 있으면 호스트 알림이 실제 채널로 나간다.
+  const SOLAPI_KEYS = [
+    "SOLAPI_API_KEY",
+    "SOLAPI_API_SECRET",
+    "SOLAPI_SENDER_PHONE",
+    "OPERATOR_PHONE",
+    "SLACK_BOT_TOKEN",
+    "SLACK_CHANNEL_ID",
+  ];
   const savedSolapi: Record<string, string | undefined> = {};
 
   beforeEach(() => {

@@ -2,20 +2,44 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Banner from "./Banner";
-import { BTN_DANGER, BTN_OUTLINE, CARD_FLUSH, SECTION_H } from "./shared";
+import type { ToastApi } from "./Toast";
+import { BTN_DANGER, BTN_OUTLINE, CARD, CARD_FLUSH, SECTION_H } from "./shared";
 
+/** GET /api/admin/notify-test — 발송 없이 환경변수만 점검한 결과 (8장) */
 export type NotifyEnv = {
   ok: boolean;
   missingRequired: string[];
   missingKakao: string[];
   kakaoMode: string;
   operatorPhoneMasked: string | null;
+  /** 8장에서 추가된 필드. 서버가 아직 안 내려주면 "미설정"으로 본다. */
+  slack?: { configured?: boolean; channel?: string | null } | null;
 };
 
 type ApiFetch = (path: string, init?: RequestInit) => Promise<{ ok: boolean; status: number; data: unknown }>;
 
-function CheckLine({ label, missing }: { label: string; missing: string[] }) {
-  const good = missing.length === 0;
+/* 슬랙 오류 코드는 그대로 보여주고(검색이 되니까) 흔한 원인만 한 줄 덧붙인다. */
+const SLACK_HINT: Record<string, string> = {
+  not_in_channel: "채널에 봇을 초대하세요(/invite)",
+  channel_not_found: "채널 ID를 확인하세요",
+  invalid_auth: "토큰을 확인하세요",
+};
+
+/** 응답 어디에 오류 코드가 실려 오든 하나만 집어낸다 (error · slack.error · result.error) */
+function slackErrorCode(d: Record<string, unknown>): string {
+  const nested = (v: unknown): string => {
+    if (v && typeof v === "object" && "error" in v) {
+      const e = (v as { error: unknown }).error;
+      return typeof e === "string" ? e : "";
+    }
+    return "";
+  };
+  if (typeof d.error === "string" && d.error) return d.error;
+  return nested(d.slack) || nested(d.result) || "";
+}
+
+/** 점 + 글자 두 벌로 알린다 — 색만으로 상태를 말하지 않는다 */
+function StatusLine({ label, good, text }: { label: string; good: boolean; text: string }) {
   return (
     <li className="flex items-baseline gap-3 border-b border-gray-100 py-2.5 last:border-0">
       <span className="flex w-24 shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-gray-700">
@@ -26,19 +50,31 @@ function CheckLine({ label, missing }: { label: string; missing: string[] }) {
         {label}
       </span>
       <span className={`min-w-0 flex-1 [overflow-wrap:anywhere] text-sm ${good ? "text-teal-dark" : "text-brown"}`}>
-        {good ? "전부 설정됨" : `${missing.length}개 미설정 · ${missing.join(", ")}`}
+        {text}
       </span>
     </li>
   );
 }
 
-/** 설정 탭 — 알림 환경변수 점검(발송 없음) + 실제 테스트 문자 발송(확인 단계) */
-export default function SettingsTab({ apiFetch }: { apiFetch: ApiFetch }) {
+function CheckLine({ label, missing }: { label: string; missing: string[] }) {
+  const good = missing.length === 0;
+  return (
+    <StatusLine
+      label={label}
+      good={good}
+      text={good ? "전부 설정됨" : `${missing.length}개 미설정 · ${missing.join(", ")}`}
+    />
+  );
+}
+
+/** 설정 탭 — 알림 환경변수 점검(발송 없음) · 슬랙 테스트(요금 없음) · 호스트 문자 테스트(확인 단계) */
+export default function SettingsTab({ apiFetch, push }: { apiFetch: ApiFetch; push: ToastApi["push"] }) {
   const [env, setEnv] = useState<NotifyEnv | null>(null);
   const [envError, setEnvError] = useState("");
   const [checking, setChecking] = useState(false);
   const [asking, setAsking] = useState(false);
   const [sending, setSending] = useState(false);
+  const [slackSending, setSlackSending] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   const applyEnv = useCallback((res: { ok: boolean; data: unknown }) => {
@@ -85,6 +121,38 @@ export default function SettingsTab({ apiFetch }: { apiFetch: ApiFetch }) {
     setSending(false);
   };
 
+  /* 슬랙은 요금이 안 나가니 확인 단계 없이 바로 보낸다. 결과는 토스트로만 — 실패하면
+     [다시 시도]가 자기 자신을 그대로 다시 부른다. */
+  const sendSlackTest = useCallback(
+    async function run() {
+      setSlackSending(true);
+      const res = await apiFetch("/api/admin/notify-test", {
+        method: "POST",
+        body: JSON.stringify({ target: "slack" }),
+      });
+      const d = (res.data ?? {}) as Record<string, unknown>;
+      setSlackSending(false);
+      if (res.ok && d.ok === true) {
+        push({ kind: "ok", text: "슬랙 채널에 테스트 메시지를 보냈어요" });
+        return;
+      }
+      const code = slackErrorCode(d);
+      const hint = SLACK_HINT[code];
+      const reason = code || `응답을 받지 못했어요 (${res.status})`;
+      push({
+        kind: "error",
+        text: `슬랙 발송 실패 — ${reason}${hint ? ` · ${hint}` : ""}`,
+        onRetry: () => void run(),
+      });
+    },
+    [apiFetch, push]
+  );
+
+  const channel = env?.slack?.channel ?? "";
+  const tokenOk = env?.slack?.configured === true;
+  const slackReady = tokenOk && !!channel;
+  const slackMissing = [tokenOk ? "" : "SLACK_BOT_TOKEN", channel ? "" : "SLACK_CHANNEL_ID"].filter(Boolean);
+
   return (
     <div className="max-w-2xl space-y-6">
       <section aria-labelledby="settings-env-h" className="space-y-2">
@@ -118,9 +186,55 @@ export default function SettingsTab({ apiFetch }: { apiFetch: ApiFetch }) {
         )}
       </section>
 
+      <section aria-labelledby="settings-slack-h" className="space-y-2">
+        <h2 id="settings-slack-h" className={SECTION_H}>
+          슬랙 알림
+        </h2>
+
+        {env && (
+          <div className={CARD}>
+            <ul>
+              <StatusLine
+                label="봇 토큰"
+                good={tokenOk}
+                text={tokenOk ? "설정됨 (SLACK_BOT_TOKEN)" : "미설정 (SLACK_BOT_TOKEN)"}
+              />
+              <StatusLine
+                label="채널 ID"
+                good={!!channel}
+                text={channel || "미설정 (SLACK_CHANNEL_ID)"}
+              />
+            </ul>
+
+            <p className="mt-3 text-xs leading-5 break-keep text-gray-700">
+              슬랙이 설정되면 호스트 문자는 보내지 않고 슬랙 채널로만 알립니다. 미설정·실패 시 문자로 대체됩니다.
+            </p>
+
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => void sendSlackTest()}
+                disabled={!slackReady || slackSending}
+                aria-describedby={slackReady ? undefined : "settings-slack-why"}
+                className={BTN_OUTLINE}
+              >
+                {slackSending ? "보내는 중…" : "슬랙 테스트 보내기"}
+              </button>
+              {!slackReady && (
+                <p id="settings-slack-why" className="mt-2 text-xs leading-5 break-keep text-brown">
+                  아직 보낼 수 없어요 — 미설정: {slackMissing.join(", ")}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!env && !envError && <div className={`${CARD_FLUSH} h-40 animate-pulse`} aria-busy="true" />}
+      </section>
+
       <section aria-labelledby="settings-test-h" className="space-y-2">
         <h2 id="settings-test-h" className={SECTION_H}>
-          테스트 문자 보내기
+          호스트 문자 테스트 (슬랙 미설정 시 대체 경로)
         </h2>
         <p className="text-xs leading-5 break-keep text-gray-700">
           호스트 번호 {env?.operatorPhoneMasked ?? "(미설정)"}로 <strong>실제 문자 1건</strong>이 발송됩니다. 건당

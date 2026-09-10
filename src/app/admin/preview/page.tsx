@@ -120,6 +120,7 @@ const SAMPLE_ENV = {
   missingKakao: ["KAKAO_TEMPLATE_STAY_CHECKOUT"],
   kakaoMode: "게스트 알림톡 발송 안 함 (템플릿 env 미설정) · 호스트에는 문자 발송",
   operatorPhoneMasked: "010-****-1234",
+  slack: { configured: true, channel: "C0123SAMPLE" },
 };
 
 /** 실제 API의 meta(6.1)를 흉내 낸다 — rows와 길이·순서가 같고 meta[0]은 헤더 행 */
@@ -267,6 +268,23 @@ export default function AdminPreviewPage() {
     async (path: string, init?: RequestInit): Promise<ApiResult> => {
       if (path.startsWith("/api/admin/notify-test") && (!init || init.method !== "POST")) {
         return { ok: true, status: 200, data: SAMPLE_ENV };
+      }
+
+      // 슬랙 테스트만 미리보기에서 "성공"으로 답한다 — 요금이 없고, 카드의 정상 상태를 봐야 한다.
+      // 문자 테스트는 아래 기본 응답(발송 안 함)으로 떨어진다.
+      if (path.startsWith("/api/admin/notify-test") && init?.method === "POST") {
+        const { target } = JSON.parse(String(init.body ?? "{}")) as { target?: string };
+        if (target === "slack") {
+          return {
+            ok: true,
+            status: 200,
+            data: {
+              ok: true,
+              target: "slack",
+              slack: { configured: true, channel: SAMPLE_ENV.slack.channel },
+            },
+          };
+        }
       }
 
       if (path === "/api/admin/bulk" && (!init || init.method !== "POST")) {

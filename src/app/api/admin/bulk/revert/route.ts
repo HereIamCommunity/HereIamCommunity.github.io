@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { planRevertWrites } from "@/lib/bulk";
 import { findBulkLog, kstTimestamp, markBulkLogReverted } from "@/lib/bulk-log";
 import { batchUpdateCells } from "@/lib/sheets";
+import { summarizeBulkFilter } from "@/lib/bulk";
+import { postSlack } from "@/lib/slack";
+import { buildSimpleBlocks } from "@/lib/slack-blocks";
 
 /**
  * 일괄 처리 되돌리기 — `_bulk_log`의 스냅샷(실행 직전 N·O 원값)을 그대로 다시 쓴다.
@@ -66,6 +69,24 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[BULK REVERT] job=${jobId} restored=${entry.snapshot.length}`);
+
+    // 운영자 슬랙 알림 — 실패해도 되돌리기 결과는 그대로 돌려준다.
+    try {
+      await postSlack(
+        buildSimpleBlocks(
+          "📦 일괄 처리 되돌리기",
+          [
+            { label: "조건", value: summarizeBulkFilter(entry.filter, entry.action) },
+            { label: "복구", value: `${entry.snapshot.length}건` },
+            { label: "원래 실행", value: entry.at },
+            { label: "실행자", value: "어드민" },
+          ],
+          "되돌리기는 알림을 보내지 않습니다."
+        )
+      );
+    } catch (e) {
+      console.warn("[BULK REVERT] 슬랙 알림 실패", e);
+    }
 
     return NextResponse.json({
       ok: true,
