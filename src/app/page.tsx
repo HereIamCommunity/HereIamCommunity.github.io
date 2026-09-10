@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import HomePrograms from "@/components/HomePrograms";
 export default function Home() {
   return (
     <div className="bg-[#faf9f7]">
@@ -128,7 +129,10 @@ export default function Home() {
         </Link>
       ))}
 
-      {/* ── 3. 스토어 + 안동 ── */}
+      {/* ── 3. 이번 달 프로그램 미리보기 ── */}
+      <HomePrograms />
+
+      {/* ── 4. 스토어 + 안동 ── */}
       <div className="flex flex-col md:flex-row min-h-[45vh]">
         {/* 스토어 */}
         <Link

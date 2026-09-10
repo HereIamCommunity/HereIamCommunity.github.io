@@ -153,13 +153,8 @@ export default function BookingCheckPage() {
 
                 <p className="text-xs text-gray-400 text-center pt-2">
                   문의가 있으시면{" "}
-                  <a
-                    href="https://instagram.com/koinonia_andong"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#ff6b35]"
-                  >
-                    @koinonia_andong
+                  <a href="tel:01026089144" className="text-[#ff6b35]">
+                    010-2608-9144
                   </a>
                   으로 연락주세요.
                 </p>

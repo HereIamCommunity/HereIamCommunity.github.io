@@ -51,6 +51,11 @@ export default function Footer() {
                   안동 가이드 · Andong
                 </Link>
               </li>
+              <li>
+                <Link href="/booking-check" className="hover:text-[#ff6b35] transition-colors">
+                  예약 확인
+                </Link>
+              </li>
             </ul>
           </div>
 
