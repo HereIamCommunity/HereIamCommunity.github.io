@@ -202,3 +202,42 @@ export function buildStats(bookings: string[][], now?: Date): Stats; // 헤더 �
 
 ### AC
 기존 AC + `POST /api/admin/status` with `ref` 경로 테스트(순수 함수로 분리 가능한 부분), 연락처 없는 행에 confirm → 200 + guest skipped. 스크린샷 390/1280 today·list 재촬영.
+
+## 7. 일괄 처리 (2026-09-10 운영 요청)
+
+신청 리스트 탭 상단 "일괄 처리" 버튼 → 패널. 조건으로 대상을 고르고 미리보기 후 실행. 실행 기록을 남겨 되돌리기 가능.
+
+### 화면 (Esther) — `_components/BulkPanel.tsx`
+```
+일괄 처리
+조건   사용일 [ ○ 이전  ○ 이후 ] [2026-09-10]   상태 [입금대기 ▾]   구분 [전체 ▾]
+동작   [입금확인 ▾]  ☑ 알림 보내지 않기 (고객·호스트 모두)
+────────────────────────────────────────────────
+미리보기  99건 (살롱 88 · 스테이 11)          [목록 보기 ⌄]
+                                        [실행]
+```
+- 동작: 입금확인 / 취소 / 되돌리기(신청으로). 상태 조건: 입금대기 / 확정 / 취소 / 전체.
+- "알림 보내지 않기" 기본 체크. 해제하면 경고 문구("N명에게 알림톡이 나갑니다").
+- 실행 → 확인 다이얼로그(대상 수·동작·알림 여부 요약) → 진행 표시(N/전체) → 완료 토스트 + 결과 요약(성공/실패, 실패 목록).
+- 패널 하단 "최근 일괄 처리" 목록: 시각 · 조건 요약 · 건수 · [되돌리기]. 되돌리기도 확인 다이얼로그.
+- 사용일 판정은 서버와 동일 규칙(`usageDateISO`). 미리보기는 서버 API로(클라 계산 X) — 실행 대상과 정확히 같아야 한다.
+
+### API (Max)
+`POST /api/admin/bulk` body:
+```ts
+{ mode: "preview" | "run";
+  filter: { usageBefore?: string; usageAfter?: string; status: "pending"|"confirmed"|"cancelled"|"all"; type: "all"|"salon"|"stay" };
+  action: "confirm" | "cancel" | "reopen";
+  notify: boolean;
+  jobId?: string }             // run 시 preview가 준 jobId를 넘겨 대상이 같음을 보장
+```
+- preview: 시트 전체를 읽어 대상 계산 → `{ ok, jobId, count, byType: {salon, stay}, rows: [{ref, name, type, usage, status}] }`. jobId는 대상 ref 목록 해시(서버 메모리 캐시 X — 무상태. run 시 다시 계산해 해시가 다르면 409 "대상이 바뀌었어요, 미리보기를 다시 해주세요").
+- run: 대상마다 `resolveStatusAction` 판정(허용 안 되는 상태는 skip으로 집계) → **values.batchUpdate 한 번**으로 N열(+notify:false면 O열 `🔕 HH:MM 확정 알림 없음`) 갱신 → notify:true면 이후 건별 `notifyBooking`(순차, 150ms 간격, 실패해도 계속) → `{ ok, jobId, updated, skipped, notified, failed: [{ref, error}] }`.
+- run 전에 대상 행의 N·O 원값을 **스냅샷**으로 저장: 시트에 `_bulk_log` 탭(없으면 생성) 행 추가 — `[jobId, 시각, 조건 JSON, 동작, 건수, 스냅샷 JSON(ref/status/notify 배열)]`. 스프레드시트가 단일 진실 원천이므로 로그도 시트에.
+- `GET /api/admin/bulk` → `_bulk_log` 최근 20건 `{ jobs: [{jobId, at, summary, count, reverted}] }`.
+- `POST /api/admin/bulk/revert` `{ jobId }` → 로그의 스냅샷으로 `batchUpdateCells`(기존 restore-cells 로직 재사용) → 로그 행에 reverted 표시. 되돌리기는 알림 없음.
+- 기존 `restore-cells` 라우트는 revert가 대체하므로 삭제.
+- 순수 함수(`src/lib/bulk.ts`): `selectBulkTargets(rows, meta, filter, now)`, `bulkJobId(refs)`, `planBulkWrites(targets, action, notify, now)` → 테스트.
+
+### AC
+typecheck/test/eslint/build + preview 페이지에서 패널 열고 미리보기(가짜 API)·실행·되돌리기 흐름 동작 + 스크린샷 390/1280.
