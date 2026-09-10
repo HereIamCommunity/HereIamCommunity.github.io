@@ -53,3 +53,10 @@ describe("notifyStatusText — 지난 예약", () => {
     expect(t).toMatch(/^⏭ \d{2}:\d{2} 확정 건너뜀\(지난 예약\)$/);
   });
 });
+
+describe("silentStatusText", () => {
+  it("🔕 HH:MM 확정 알림 없음", async () => {
+    const { silentStatusText } = await import("@/lib/messaging");
+    expect(silentStatusText("confirmed")).toMatch(/^🔕 \d{2}:\d{2} 확정 알림 없음$/);
+  });
+});

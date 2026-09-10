@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseAdminRow } from "@/lib/admin-row";
 import { parseStatusRequest, resolveStatusAction } from "@/lib/admin-actions";
-import { notifyBooking } from "@/lib/messaging";
+import { notifyBooking, silentStatusText } from "@/lib/messaging";
 import type { RowRef } from "@/lib/row-ref";
 import {
   appendBookingMemo,
@@ -9,6 +9,7 @@ import {
   updateBookingStatus,
   updateOpenStayStatus,
   updateRetreatStatus,
+  updateNotifyStatus,
 } from "@/lib/sheets";
 
 /**
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
         { status: parsed.httpStatus }
       );
     }
-    const { sheet, row, action, reason, ref } = parsed.value;
+    const { sheet, row, action, reason, ref, notify: wantNotify } = parsed.value;
 
     if (sheet === "retreat" || sheet === "open") {
       return handleSimpleSheet(sheet, row, action, ref);
@@ -92,8 +93,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!resolved.event) {
-      return NextResponse.json({ ok: true, status: resolved.status });
+    if (!resolved.event || !wantNotify) {
+      // notify:false — 일괄 정리 등 알림 없이 상태만 바꿀 때. O열엔 "🔕 HH:MM 확정 알림 없음"을 남긴다.
+      if (!wantNotify && resolved.event) {
+        try {
+          await updateNotifyStatus(booking.type, booking.createdAt ?? "", booking.phone, silentStatusText(resolved.event), ref);
+        } catch (e) {
+          console.error("[STATUS] 알림 없음 기록 실패", e);
+        }
+      }
+      return NextResponse.json({ ok: true, status: resolved.status, notify: wantNotify ? undefined : { guest: "skipped", host: "skipped", guestSkipReason: "알림 없이 처리" } });
     }
 
     // 연락처가 없으면 게스트 알림만 skipped(사유 "연락처 없음")이 되고 호스트 문자는 그대로 나간다.

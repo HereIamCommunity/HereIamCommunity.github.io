@@ -55,6 +55,11 @@ export function notifyStatusText(event: BookingEvent, result: SendBookingResult)
   return hostFailed ? `${base} (호스트 ❌)` : base;
 }
 
+/** notify:false 로 처리한 건의 O열 문구 — "🔕 14:32 확정 알림 없음" */
+export function silentStatusText(event: BookingEvent): string {
+  return `🔕 ${nowHHMM()} ${EVENT_SHORT[event]} 알림 없음`;
+}
+
 export async function notifyBooking(
   event: BookingEvent,
   booking: Booking,

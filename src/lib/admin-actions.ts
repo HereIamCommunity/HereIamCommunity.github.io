@@ -84,6 +84,8 @@ export type StatusRequest = {
   reason?: string;
   /** 시트 행 번호로 직접 가리키는 참조. 없거나 형식이 틀리면 기존 탐색 경로. */
   ref?: RowRef;
+  /** false면 게스트·호스트 알림을 모두 보내지 않고 상태만 바꾼다 (일괄 정리용). 기본 true. */
+  notify: boolean;
 };
 
 export type StatusRequestParse =
@@ -102,7 +104,7 @@ function isAdminAction(v: unknown): v is AdminAction {
  */
 export function parseStatusRequest(body: unknown): StatusRequestParse {
   const b = (body ?? {}) as {
-    sheet?: unknown; row?: unknown; action?: unknown; reason?: unknown; ref?: unknown;
+    sheet?: unknown; row?: unknown; action?: unknown; reason?: unknown; ref?: unknown; notify?: unknown;
   };
 
   if (!Array.isArray(b.row) || b.row.length === 0) {
@@ -127,6 +129,7 @@ export function parseStatusRequest(body: unknown): StatusRequestParse {
       action: b.action,
       reason: typeof b.reason === "string" ? b.reason : undefined,
       ...(ref ? { ref } : {}),
+      notify: b.notify !== false,
     },
   };
 }

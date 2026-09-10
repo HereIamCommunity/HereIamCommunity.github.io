@@ -146,3 +146,19 @@ describe("parseStatusRequest", () => {
     expect(res.ok && res.value.reason).toBe(" 개인 사정 ");
   });
 });
+
+describe("parseStatusRequest — notify 플래그", () => {
+  const base = { row: ["", "살롱", "홍길동", "010-0000-0000"], action: "confirm" };
+  it("기본은 true", () => {
+    const r = parseStatusRequest(base);
+    expect(r.ok && r.value.notify).toBe(true);
+  });
+  it("notify:false 면 false", () => {
+    const r = parseStatusRequest({ ...base, notify: false });
+    expect(r.ok && r.value.notify).toBe(false);
+  });
+  it("notify가 이상한 값이면 true (안전 기본값)", () => {
+    const r = parseStatusRequest({ ...base, notify: "no" });
+    expect(r.ok && r.value.notify).toBe(true);
+  });
+});
