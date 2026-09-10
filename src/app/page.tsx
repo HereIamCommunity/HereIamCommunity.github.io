@@ -83,7 +83,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── 2. 살롱 + 스테이: 교차 에디토리얼 ── */}
+      {/* ── 2. 이번 달 프로그램 미리보기 ── */}
+      <HomePrograms />
+
+      {/* ── 3. 살롱 + 스테이: 교차 에디토리얼 ── */}
       {[
         {
           href: "/salon",
@@ -128,9 +131,6 @@ export default function Home() {
           </div>
         </Link>
       ))}
-
-      {/* ── 3. 이번 달 프로그램 미리보기 ── */}
-      <HomePrograms />
 
       {/* ── 4. 스토어 + 안동 ── */}
       <div className="flex flex-col md:flex-row min-h-[45vh]">
