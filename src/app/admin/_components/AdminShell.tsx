@@ -334,7 +334,7 @@ export default function AdminShell({
           <RetreatTab retreats={retreats} counts={digest.retreatCounts} actions={actions} loading={loading} />
         )}
         {tab === "open" && <OpenStayTab openStays={openStays} actions={actions} loading={loading} />}
-        {tab === "settings" && <SettingsTab apiFetch={apiFetch} />}
+        {tab === "settings" && <SettingsTab apiFetch={apiFetch} push={toasts.push} />}
       </div>
 
       <ToastStack {...toasts} />

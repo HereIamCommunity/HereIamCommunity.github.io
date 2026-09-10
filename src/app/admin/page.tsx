@@ -39,9 +39,15 @@ type LoadResult =
   | { kind: "error" }
   | { kind: "offline" };
 
-/** 알림 결과를 사람이 읽는 한 줄로 */
-function notifySuffix(notify: unknown): string {
-  const n = notify as { guest?: unknown; guestSkipReason?: unknown } | undefined;
+type NotifyResult = {
+  guest?: unknown;
+  guestSkipReason?: unknown;
+  host?: unknown;
+  hostChannel?: unknown;
+};
+
+/** 게스트 알림 결과 한 조각 */
+function guestSuffix(n: NotifyResult | undefined): string {
   const guest = n?.guest;
   if (guest === "ok") return " · 게스트 알림톡 발송됨";
   if (guest === "skipped") {
@@ -54,6 +60,21 @@ function notifySuffix(notify: unknown): string {
     return ` · 알림 실패: ${(guest as { error: string }).error}`;
   }
   return "";
+}
+
+/** 호스트 알림 결과 한 조각 (8장 — 슬랙이 기본, 실패·미설정이면 문자) */
+function hostSuffix(n: NotifyResult | undefined): string {
+  const host = n?.host;
+  if (host && typeof host === "object" && "error" in host) return " · 호스트 알림 실패";
+  if (n?.hostChannel === "slack") return " · 호스트 슬랙 알림 보냄";
+  if (n?.hostChannel === "sms") return " · 호스트 문자 보냄";
+  return "";
+}
+
+/** 알림 결과를 사람이 읽는 한 줄로 */
+function notifySuffix(notify: unknown): string {
+  const n = notify as NotifyResult | undefined;
+  return `${guestSuffix(n)}${hostSuffix(n)}`;
 }
 
 const ACTION_LABEL: Record<StatusAction, string> = {

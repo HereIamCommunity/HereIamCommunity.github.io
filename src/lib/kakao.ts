@@ -23,6 +23,7 @@
 
 import { SolapiMessageService } from "solapi";
 import { isPastBooking } from "@/lib/past-booking";
+import { notifyHost, type HostChannel } from "@/lib/host-notify";
 
 const ADMIN_URL = "koinonia-web.vercel.app/admin";
 
@@ -98,6 +99,8 @@ export type SendBookingResult = {
   groupId?: string;
   /** 게스트를 건너뛴 이유 (예: "연락처 없음"). guest === "skipped"일 때만 있다. */
   guestSkipReason?: string;
+  /** 호스트 알림이 실제로 나간 경로. 슬랙 우선 → 실패·미설정이면 문자. 수신처가 없으면 "none". */
+  hostChannel?: HostChannel;
 };
 
 /* ─── 헬퍼 ──────────────────────────────────────── */
@@ -105,7 +108,8 @@ function stripPhone(phone: string) {
   return (phone || "").replace(/[^0-9]/g, "");
 }
 
-function won(amount: number) {
+/** 금액 표기 (1,000 단위 쉼표). 호스트 문자·슬랙 블록이 같은 함수를 쓴다. */
+export function won(amount: number) {
   return (amount || 0).toLocaleString("en-US");
 }
 
@@ -130,6 +134,14 @@ const EVENT_LABEL: Record<BookingEvent, string> = {
   confirmed: "입금확인 완료",
   cancelled: "취소 처리",
 };
+
+/**
+ * 호스트 알림 제목에 쓰는 이벤트 이름. 카드결제로 확정된 건만 따로 표기한다.
+ * 문자(buildHostMessage)와 슬랙(buildHostBlocks)이 같은 이름을 쓰도록 한 곳에 둔다.
+ */
+export function hostEventLabel(event: BookingEvent, booking: Booking): string {
+  return event === "confirmed" && booking.via === "toss" ? "카드결제 완료" : EVENT_LABEL[event];
+}
 
 /** 템플릿 ID와 pfId가 모두 있을 때만 kakaoOptions를 만든다. */
 export function kakaoOptions(
@@ -271,7 +283,7 @@ function hostNextLines(event: BookingEvent, ctx: HostContext): string[] {
 }
 
 export function buildHostMessage(event: BookingEvent, booking: Booking, ctx: HostContext = {}): BuiltMessage {
-  const eventLabel = event === "confirmed" && booking.via === "toss" ? "카드결제 완료" : EVENT_LABEL[event];
+  const eventLabel = hostEventLabel(event, booking);
   const label = typeLabel(booking);
   const detail = detailLine(booking);
   const amount = won(booking.totalAmount);
@@ -357,8 +369,9 @@ function failureOf(to: string, failed: readonly FailedEntry[]): SendResult {
 }
 
 /**
- * 게스트 → 호스트 순서로 두 번 발송한다 (게스트 결과를 호스트 문자에 싣기 위해).
+ * 게스트 → 호스트 순서로 두 번 발송한다 (게스트 결과를 호스트 알림에 싣기 위해).
  * 알림톡 옵션이 없으면 text만 보내 순수 문자로 나간다.
+ * 호스트는 notifyHost가 슬랙 → 문자 순으로 고른다 (게스트 경로는 그대로 솔라피).
  */
 export async function sendBookingMessages(
   event: BookingEvent,
@@ -366,8 +379,10 @@ export async function sendBookingMessages(
   opts: { hostOnly?: boolean } = {}
 ): Promise<SendBookingResult> {
   if (!hasSolapi()) {
-    console.warn("[NOTIFY] 솔라피 환경변수 미설정 — 발송 건너뜀");
-    return { guest: "skipped", host: "skipped" };
+    // 솔라피가 없어도 호스트 슬랙은 살아 있어야 한다 (문자 대체만 불가능).
+    console.warn("[NOTIFY] 솔라피 환경변수 미설정 — 게스트 발송 건너뜀");
+    const only = await notifyHost(event, booking);
+    return { guest: "skipped", host: only.result, hostChannel: only.channel };
   }
 
   const from = stripPhone(process.env.SOLAPI_SENDER_PHONE!);
@@ -395,19 +410,36 @@ export async function sendBookingMessages(
     console.warn(`[NOTIFY] ${guestSkipReason} — ${event} 게스트 발송 건너뜀`);
   }
 
-  // 2) 호스트 — 게스트 결과 포함
-  let host: SendResult = "skipped";
-  if (plan.host && hostTo) {
-    const m = buildHostMessage(event, booking, {
-      guestResult: opts.hostOnly ? undefined : guest,
-      guestSkipReason,
-    });
-    const r = await sendSingle(client, { to: hostTo, from, text: m.text, kakaoOptions: m.kakaoOptions });
-    host = r.result;
-    groupId = groupId ?? r.groupId;
-  }
+  // 2) 호스트 — 게스트 결과 포함. 슬랙 우선, 실패·미설정이면 아래 문자 콜백으로 대체된다.
+  //    슬랙은 OPERATOR_PHONE이 없어도 나간다(문자 수신처와 무관).
+  const hostCtx: HostContext = {
+    guestResult: opts.hostOnly ? undefined : guest,
+    guestSkipReason,
+  };
+  const sendHostSms =
+    plan.host && hostTo
+      ? async (): Promise<SendResult> => {
+          const m = buildHostMessage(event, booking, hostCtx);
+          const r = await sendSingle(client, {
+            to: hostTo,
+            from,
+            text: m.text,
+            kakaoOptions: m.kakaoOptions,
+          });
+          groupId = groupId ?? r.groupId;
+          return r.result;
+        }
+      : undefined;
 
-  return { guest, host, groupId, ...(guestSkipReason ? { guestSkipReason } : {}) };
+  const hostSent = await notifyHost(event, booking, hostCtx, sendHostSms);
+
+  return {
+    guest,
+    host: hostSent.result,
+    hostChannel: hostSent.channel,
+    groupId,
+    ...(guestSkipReason ? { guestSkipReason } : {}),
+  };
 }
 
 async function sendSingle(

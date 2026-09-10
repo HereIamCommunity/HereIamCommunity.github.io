@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildGuestMessage, buildHostMessage, sendBookingMessages, type Booking } from "@/lib/kakao";
+import { isSlackConfigured, postSlack, slackChannelId } from "@/lib/slack";
+import { buildSimpleBlocks } from "@/lib/slack-blocks";
 
 /**
  * 알림 연결 테스트.
  * GET  — 발송 없이 환경변수만 점검한다 (어드민 설정 탭이 진입할 때마다 호출).
  * POST — 호스트 번호로 샘플 'received' 메시지를 실제 발송하고 솔라피 응답을 돌려준다.
+ *        body `{ target: "slack" }`이면 슬랙 채널에만 테스트 1건을 보내고 문자는 보내지 않는다.
  */
 
 const REQUIRED = [
@@ -47,6 +50,8 @@ function checkEnv() {
         ? "알림톡 (실패 시 문자 대체)"
         : "게스트 알림톡 발송 안 함 (템플릿 env 미설정) · 호스트에는 문자 발송",
     operatorPhoneMasked: maskPhone(process.env.OPERATOR_PHONE),
+    // 슬랙이 설정돼 있으면 호스트 알림이 채널로, 아니면 기존 문자로 나간다.
+    slack: { configured: isSlackConfigured(), channel: slackChannelId() },
   };
 }
 
@@ -63,6 +68,45 @@ export async function POST(req: NextRequest) {
   const password = req.headers.get("x-admin-password");
   if (password !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = (await req.json().catch(() => ({}))) as { target?: unknown };
+
+  // 슬랙 테스트 — 문자는 보내지 않는다(요금 없음). 솔라피 환경변수와 무관하게 동작한다.
+  if (body?.target === "slack") {
+    if (!isSlackConfigured()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          target: "slack",
+          error: "슬랙이 설정되지 않았습니다. SLACK_BOT_TOKEN / SLACK_CHANNEL_ID를 확인해주세요.",
+          slack: { configured: false, channel: slackChannelId() },
+        },
+        { status: 400 }
+      );
+    }
+
+    const now = new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
+    const sent = await postSlack(
+      buildSimpleBlocks(
+        "🔔 슬랙 알림 테스트",
+        [
+          { label: "보낸 곳", value: "어드민 설정 탭" },
+          { label: "시각", value: now },
+        ],
+        "이 메시지가 보이면 호스트 알림이 이 채널로 나갑니다."
+      )
+    );
+
+    return NextResponse.json(
+      {
+        ok: sent.ok,
+        target: "slack",
+        ...(sent.ok ? { ts: sent.ts } : { error: sent.error }),
+        slack: { configured: true, channel: slackChannelId() },
+      },
+      { status: sent.ok ? 200 : 502 }
+    );
   }
 
   const missingRequired = REQUIRED.filter((k) => !process.env[k]);
@@ -101,6 +145,9 @@ export async function POST(req: NextRequest) {
       ? "알림톡 (실패 시 문자 대체)"
       : "게스트 알림톡 발송 안 함 (템플릿 env 미설정) · 호스트에는 문자 발송",
     sentTo: process.env.OPERATOR_PHONE,
+    // 슬랙이 설정돼 있으면 호스트 알림은 문자가 아니라 채널로 나간다.
+    hostChannel: result.hostChannel ?? "none",
+    slack: { configured: isSlackConfigured(), channel: slackChannelId() },
     result,
     preview: {
       guest: buildGuestMessage("received", sample).text,

@@ -18,6 +18,8 @@ import {
 } from "@/lib/bulk-log";
 import { notifyBooking, notifyStatusText } from "@/lib/messaging";
 import { batchUpdateCells, getAllBookingsWithMeta } from "@/lib/sheets";
+import { postSlack } from "@/lib/slack";
+import { buildSimpleBlocks } from "@/lib/slack-blocks";
 import { refCellRange, type RowRef } from "@/lib/row-ref";
 
 /**
@@ -202,6 +204,25 @@ export async function POST(req: NextRequest) {
       `[BULK] job=${jobId} action=${action} notify=${notify} applied=${plan.applied.length}` +
         ` skipped=${plan.skipped.length} notified=${notified} failed=${failed.length}`
     );
+
+    // 운영자 슬랙 알림 — 실패해도 일괄 처리 결과는 그대로 돌려준다.
+    try {
+      await postSlack(
+        buildSimpleBlocks(
+          "📦 일괄 처리 실행",
+          [
+            { label: "조건", value: summarizeBulkFilter(filter, action) },
+            { label: "처리", value: `${plan.applied.length}건` },
+            { label: "건너뜀", value: `${plan.skipped.length}건` },
+            { label: "알림", value: notify ? `보냄 ${notified}건 · 실패 ${failed.length}건` : "없음" },
+            { label: "실행자", value: "어드민" },
+          ],
+          `되돌리려면 어드민 일괄 처리 탭에서 ${at} 기록을 열어주세요.`
+        )
+      );
+    } catch (e) {
+      console.warn("[BULK] 슬랙 알림 실패", e);
+    }
 
     return NextResponse.json({
       ok: true,

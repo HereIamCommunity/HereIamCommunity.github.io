@@ -65,6 +65,10 @@ Vercel 대시보드 > Project > Settings > Environment Variables. **Production�
 | `KAKAO_TEMPLATE_HOST` | 호스트 알림 | **선택** — 미등록. 없으면 호스트는 문자 |
 | `OPERATOR_PHONE` | 호스트 수신번호 | 기존, 하이픈 없이 |
 | `ADMIN_PASSWORD` | 어드민 인증 | 기존 |
+| `SLACK_BOT_TOKEN` | 호스트 알림 슬랙 봇 토큰 | **선택** — `xoxb-…`, 스코프 `chat:write`. 없으면 호스트는 문자 |
+| `SLACK_CHANNEL_ID` | 호스트 알림 슬랙 채널 | **선택** — `C0…`, 봇을 채널에 `/invite` 필요. 없으면 호스트는 문자 |
+
+호스트 알림은 `SLACK_BOT_TOKEN`·`SLACK_CHANNEL_ID`가 **둘 다** 있을 때만 슬랙으로 나가고, 슬랙 발송이 실패하면 같은 내용이 기존 호스트 문자로 대체된다(docs/admin-ux-design.md 8장).
 
 템플릿 ID·본문·변수명은 `docs/alimtalk-templates.md`가 정본이고, 원본 덤프는 `phases/notify/solapi-templates.json`이다.
 기존 `KAKAO_TEMPLATE_CANCELLED`(살롱·스테이 공통)는 살롱/스테이로 갈라져 더 이상 읽지 않는다. `KAKAO_TEMPLATE_SALON`, `KAKAO_TEMPLATE_STAY`도 마찬가지. 남아 있어도 무해.

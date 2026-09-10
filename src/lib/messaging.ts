@@ -86,8 +86,10 @@ export async function notifyBooking(
     }
   }
 
+  // 호스트는 채널까지 남긴다 — "host=ok@slack" / "host=ok@sms" / "host=skipped@none"
+  const hostLabel = `${resultLabel(result.host)}@${result.hostChannel ?? "none"}`;
   console.log(
-    `[NOTIFY] event=${event} guest=${resultLabel(result.guest)} host=${resultLabel(result.host)}` +
+    `[NOTIFY] event=${event} guest=${resultLabel(result.guest)} host=${hostLabel}` +
       ` groupId=${result.groupId ?? "-"} sheet=${sheetRecorded}`
   );
 

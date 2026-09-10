@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appendRetreat, getRetreatCounts } from "@/lib/sheets";
 import { sendOperatorAlert, sendRetreatConfirmation } from "@/lib/email";
+import { postSlack } from "@/lib/slack";
+import { buildSimpleBlocks } from "@/lib/slack-blocks";
 
 const MAX_PER_SESSION = 6;
 
@@ -56,6 +58,26 @@ export async function POST(req: NextRequest) {
       parentNote: parentNote ?? "",
       status: "신청",
     });
+
+    // 운영자 슬랙 알림 — 실패해도 신청 처리는 그대로 끝낸다.
+    try {
+      await postSlack(
+        buildSimpleBlocks(
+          "🏕 리트릿 신청",
+          [
+            { label: "이름", value: name },
+            { label: "연락처", value: phone },
+            { label: "회차", value: SESSION_LABELS[session] ?? session },
+            { label: "학년", value: grade },
+            { label: "지역", value: region || "-" },
+            { label: "참가비", value: "440,000원" },
+          ],
+          "어드민 리트릿 탭에서 확인해주세요."
+        )
+      );
+    } catch (e) {
+      console.warn("[RETREAT] 슬랙 알림 실패:", e);
+    }
 
     // 운영자 이메일 알림
     try {
