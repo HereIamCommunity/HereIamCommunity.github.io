@@ -659,3 +659,15 @@ export async function initSheetHeaders() {
     requestBody: { values: headers },
   });
 }
+
+/** 여러 셀을 한 번의 요청으로 쓴다 (values.batchUpdate). 반환: 갱신된 셀 수. */
+export async function batchUpdateCells(data: { range: string; values: string[][] }[]): Promise<number> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return 0;
+  if (data.length === 0) return 0;
+  const sheets = google.sheets({ version: "v4", auth: getAuth() });
+  const res = await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    requestBody: { valueInputOption: "USER_ENTERED", data },
+  });
+  return res.data.totalUpdatedCells ?? 0;
+}
