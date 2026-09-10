@@ -28,9 +28,9 @@ function resultLabel(r: SendResult): string {
   return `error(${r.error})`;
 }
 
-function nowHHMM() {
+function nowHHMM(now: Date = new Date()) {
   // 설계 3.5의 O열 형식 "✅ 14:32 접수" — 24시간 표기 고정
-  return new Date().toLocaleTimeString("ko-KR", {
+  return now.toLocaleTimeString("ko-KR", {
     timeZone: "Asia/Seoul",
     hour: "2-digit",
     minute: "2-digit",
@@ -55,9 +55,13 @@ export function notifyStatusText(event: BookingEvent, result: SendBookingResult)
   return hostFailed ? `${base} (호스트 ❌)` : base;
 }
 
-/** notify:false 로 처리한 건의 O열 문구 — "🔕 14:32 확정 알림 없음" */
-export function silentStatusText(event: BookingEvent): string {
-  return `🔕 ${nowHHMM()} ${EVENT_SHORT[event]} 알림 없음`;
+/**
+ * notify:false 로 처리한 건의 O열 문구 — "🔕 14:32 확정 알림 없음"
+ * `now`는 **실제 시각(instant)** — 표기는 항상 KST로 변환한다. 일괄 처리는 한 잡의 모든 행에
+ * 같은 시각을 쓰려고 이 인자를 넘긴다.
+ */
+export function silentStatusText(event: BookingEvent, now: Date = new Date()): string {
+  return `🔕 ${nowHHMM(now)} ${EVENT_SHORT[event]} 알림 없음`;
 }
 
 export async function notifyBooking(

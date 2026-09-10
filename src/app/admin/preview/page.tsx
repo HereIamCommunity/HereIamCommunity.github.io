@@ -1,15 +1,20 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { buildDigest, kstToday } from "@/lib/digest";
+import { resolveStatusAction } from "@/lib/admin-actions";
+import { parseAdminRow } from "@/lib/admin-row";
+import { buildDigest, isConfirmed, isPending, kstToday } from "@/lib/digest";
+import { usageDateISO } from "@/lib/past-booking";
 import AdminShell from "../_components/AdminShell";
 import Banner from "../_components/Banner";
 import { useToasts } from "../_components/Toast";
 import type { RowRef, SheetTab } from "@/lib/row-ref";
+import type { BulkActionKey, BulkFilter, BulkJob } from "../_components/BulkPanel";
 import type { ApiResult } from "../_components/useAdminApi";
 import {
   registerRowRefs,
   rowKey,
+  rowRef,
   type AdminActions,
   type DateRange,
   type Row,
@@ -122,6 +127,82 @@ function sampleMeta(rawRows: Row[], tabOf: (row: Row) => SheetTab): RowRef[] {
   return rawRows.map((row, i) => ({ tab: tabOf(row), rowNum: i + 1 }));
 }
 
+/* ── 일괄 처리 가짜 API의 대상 계산 ────────────────────────
+   서버(`/api/admin/bulk`)는 `src/lib/bulk.ts`의 `selectBulkTargets`를 쓴다. 그 모듈을 여기서
+   그대로 import 하면 `node:crypto`(bulkJobId)와 `messaging`(솔라피)이 클라이언트 번들로 딸려온다.
+   그래서 **같은 부품으로 같은 규칙을 다시 조립한다** — `parseAdminRow` · `usageDateISO` ·
+   `isPending`/`isConfirmed` · `resolveStatusAction`은 전부 순수 함수라 화면에서 그대로 쓸 수 있다.
+   달라지는 건 jobId 해시(sha256 → 여기선 짧은 문자열)뿐이다. */
+
+const ACTION_TEXT: Record<BulkActionKey, string> = {
+  confirm: "입금확인",
+  cancel: "취소",
+  reopen: "되돌리기",
+};
+
+/** selectBulkTargets와 같은 판정 (사용일 불명 행은 대상에서 뺀다) */
+function matchesStatus(status: string, want: BulkFilter["status"]): boolean {
+  const s = (status ?? "").trim();
+  if (want === "all") return true;
+  if (want === "pending") return isPending(s);
+  if (want === "confirmed") return isConfirmed(s);
+  return s === "취소";
+}
+
+type Target = { row: Row; ref: RowRef | string; name: string; type: "salon" | "stay"; usage: string; status: string };
+
+function selectTargets(rows: Row[], filter: BulkFilter, now: Date): Target[] {
+  const out: Target[] = [];
+  for (const row of rows) {
+    const booking = parseAdminRow(row);
+    const usage = usageDateISO(booking, now);
+    if (!usage) continue;
+    if (filter.usageBefore && !(usage < filter.usageBefore)) continue;
+    if (filter.usageAfter && !(usage >= filter.usageAfter)) continue;
+    const status = (row[13] ?? "").trim();
+    if (!matchesStatus(status, filter.status)) continue;
+    if (filter.type !== "all" && booking.type !== filter.type) continue;
+    out.push({
+      row,
+      ref: rowRef(row) ?? "행 정보 없음",
+      name: row[2] ?? "",
+      type: booking.type,
+      usage,
+      status,
+    });
+  }
+  return out;
+}
+
+/** 대상 ref 목록으로 만드는 가짜 jobId (서버는 sha256 앞 12자) */
+function fakeJobId(targets: Target[]): string {
+  const key = targets.map((t) => JSON.stringify(t.ref)).sort().join("|");
+  let h = 5381;
+  for (let i = 0; i < key.length; i++) h = ((h << 5) + h + key.charCodeAt(i)) >>> 0;
+  return `preview-${h.toString(16)}-${targets.length}`;
+}
+
+function summaryOf(filter: BulkFilter, action: BulkActionKey): string {
+  const STATUS = { pending: "입금대기", confirmed: "확정", cancelled: "취소", all: "전체상태" } as const;
+  const TYPE = { all: "전체", salon: "살롱", stay: "스테이" } as const;
+  const parts: string[] = [];
+  if (filter.usageBefore) parts.push(`${filter.usageBefore} 이전`);
+  if (filter.usageAfter) parts.push(`${filter.usageAfter} 이후`);
+  parts.push(STATUS[filter.status], TYPE[filter.type], `→ ${ACTION_TEXT[action]}`);
+  return parts.join(" · ");
+}
+
+/** 서버 로그와 같은 "YYYY-MM-DD HH:mm:ss" */
+function nowLabel(now: Date): string {
+  const p = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Seoul",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  });
+  return p.format(now).replace("T", " ");
+}
+
 export default function AdminPreviewPage() {
   const toasts = useToasts();
   const { push } = toasts;
@@ -177,13 +258,121 @@ export default function AdminPreviewPage() {
     },
   };
 
+  /* 일괄 처리(7장) 가짜 서버 — 기록은 이 탭이 열려 있는 동안만 메모리에 산다.
+     대상 계산은 실제 API와 같은 규칙(사용일·상태·구분)을 쓰되, 시트를 고치지는 않는다. */
+  const jobsRef = useRef<BulkJob[]>([]);
+
   // SettingsTab이 이 함수를 useEffect 의존성으로 쓴다 — 매 렌더 새로 만들면 무한 루프
-  const apiFetch = useCallback(async (path: string, init?: RequestInit): Promise<ApiResult> => {
-    if (path.startsWith("/api/admin/notify-test") && (!init || init.method !== "POST")) {
-      return { ok: true, status: 200, data: SAMPLE_ENV };
-    }
-    return { ok: false, status: 200, data: { error: "미리보기 화면이라 실제로 발송하지 않아요." } };
-  }, []);
+  const apiFetch = useCallback(
+    async (path: string, init?: RequestInit): Promise<ApiResult> => {
+      if (path.startsWith("/api/admin/notify-test") && (!init || init.method !== "POST")) {
+        return { ok: true, status: 200, data: SAMPLE_ENV };
+      }
+
+      if (path === "/api/admin/bulk" && (!init || init.method !== "POST")) {
+        return { ok: true, status: 200, data: { ok: true, jobs: jobsRef.current } };
+      }
+
+      if (path === "/api/admin/bulk" && init?.method === "POST") {
+        const body = JSON.parse(String(init.body ?? "{}")) as {
+          mode?: string;
+          filter?: BulkFilter;
+          action?: BulkActionKey;
+          notify?: boolean;
+          jobId?: string;
+        };
+        const filter = body.filter;
+        const action = body.action ?? "confirm";
+        if (!filter) return { ok: false, status: 400, data: { error: "조건이 없어요." } };
+
+        const now = new Date();
+        const targets = selectTargets(rawRows.slice(1), filter, now);
+        const jobId = fakeJobId(targets);
+
+        if (body.mode === "preview") {
+          return {
+            ok: true,
+            status: 200,
+            data: {
+              ok: true,
+              mode: "preview",
+              jobId,
+              count: targets.length,
+              byType: {
+                salon: targets.filter((t) => t.type === "salon").length,
+                stay: targets.filter((t) => t.type === "stay").length,
+              },
+              rows: targets.map((t) => ({
+                ref: t.ref, name: t.name, type: t.type, usage: t.usage, status: t.status,
+              })),
+            },
+          };
+        }
+
+        // run — 서버와 같은 판정으로 적용/건너뜀을 나눈다. 시트를 고치지는 않는다.
+        if (body.jobId !== jobId) {
+          return {
+            ok: false,
+            status: 409,
+            data: { ok: false, error: "대상이 바뀌었어요. 미리보기를 다시 해주세요." },
+          };
+        }
+        const applied: Target[] = [];
+        const skipped: { ref: RowRef | string; name: string; reason: string }[] = [];
+        for (const t of targets) {
+          const resolved = resolveStatusAction("booking", t.status, action);
+          if (resolved.ok) applied.push(t);
+          else skipped.push({ ref: t.ref, name: t.name, reason: resolved.error });
+        }
+        // 알림을 켰을 때만 볼 수 있는 실패 — 연락처가 빈 행은 게스트 발송이 안 된다.
+        const failed = body.notify
+          ? applied
+              .filter((t) => !t.row[3])
+              .map((t) => ({ ref: t.ref, name: t.name, error: "연락처가 없어 알림을 보내지 못했어요 (미리보기)" }))
+          : [];
+
+        jobsRef.current = [
+          {
+            jobId,
+            at: nowLabel(now),
+            summary: summaryOf(filter, action),
+            action,
+            notify: !!body.notify,
+            count: applied.length,
+            reverted: "",
+          },
+          ...jobsRef.current,
+        ].slice(0, 20);
+
+        return {
+          ok: true,
+          status: 200,
+          data: {
+            ok: true,
+            mode: "run",
+            jobId,
+            at: nowLabel(now),
+            updated: applied.length,
+            notified: body.notify ? applied.length - failed.length : 0,
+            skipped,
+            failed,
+            logged: applied.length > 0,
+          },
+        };
+      }
+
+      if (path === "/api/admin/bulk/revert" && init?.method === "POST") {
+        const { jobId } = JSON.parse(String(init.body ?? "{}")) as { jobId?: string };
+        jobsRef.current = jobsRef.current.map((j) =>
+          j.jobId === jobId ? { ...j, reverted: nowLabel(new Date()) } : j
+        );
+        return { ok: true, status: 200, data: { ok: true } };
+      }
+
+      return { ok: false, status: 200, data: { error: "미리보기 화면이라 실제로 발송하지 않아요." } };
+    },
+    [rawRows]
+  );
 
   return (
     <AdminShell

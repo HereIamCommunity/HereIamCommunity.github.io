@@ -660,6 +660,89 @@ export async function initSheetHeaders() {
   });
 }
 
+/* ─────────────────────────────────────────────
+   범용 탭 헬퍼 (일괄 처리 로그 `_bulk_log` 등)
+───────────────────────────────────────────── */
+
+/** A1 표기의 탭 이름 인용 — 밑줄로 시작하는 이름(`_bulk_log`)도 안전하게. */
+export function a1Tab(name: string): string {
+  return `'${name.replace(/'/g, "''")}'`;
+}
+
+/**
+ * 탭이 없으면 만들고 1행에 헤더를 쓴다. 이미 있으면 아무것도 하지 않는다.
+ * 반환: 시트를 쓸 수 있는 환경인지(자격증명 없으면 false).
+ */
+export async function ensureSheetTab(name: string, header: string[]): Promise<boolean> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return false;
+  const sheets = google.sheets({ version: "v4", auth: getAuth() });
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+  if (meta.data.sheets?.some((s) => s.properties?.title === name)) return true;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: SPREADSHEET_ID,
+    requestBody: { requests: [{ addSheet: { properties: { title: name } } }] },
+  });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${a1Tab(name)}!A1`,
+    valueInputOption: "RAW",
+    requestBody: { values: [header] },
+  });
+  return true;
+}
+
+/** 탭 맨 끝에 한 줄 추가. 반환: 실제로 추가됐는지. */
+export async function appendSheetRow(name: string, values: string[]): Promise<boolean> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return false;
+  const sheets = google.sheets({ version: "v4", auth: getAuth() });
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${a1Tab(name)}!A:A`,
+    valueInputOption: "RAW",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: { values: [values] },
+  });
+  return true;
+}
+
+/**
+ * 없는 탭·범위를 가리켜서 난 400인지 (순수 판정).
+ *
+ * 권한·쿼터 오류를 "빈 결과"로 삼키면 호출부가 "기록 없음"으로 오해한다
+ * (되돌리기 404 오답 → 운영자가 재실행할 위험). 조용히 넘겨도 되는 건 이 경우뿐이다.
+ */
+export function isMissingRangeError(e: unknown): boolean {
+  if (!e || typeof e !== "object") return false;
+  const err = e as {
+    status?: unknown; code?: unknown; message?: unknown;
+    errors?: { message?: string }[];
+    response?: { data?: { error?: { code?: number; message?: string } } };
+  };
+  const status = Number(err.status ?? err.code ?? err.response?.data?.error?.code ?? 0);
+  if (status !== 400 && status !== 404) return false;
+  const msg = [
+    String(err.message ?? ""),
+    err.response?.data?.error?.message ?? "",
+    ...(err.errors ?? []).map((x) => x?.message ?? ""),
+  ].join(" ");
+  return /Unable to parse range/i.test(msg);
+}
+
+/**
+ * 범위를 읽어 행 배열로. 자격증명이 없으면 빈 배열.
+ *
+ * **시트 오류는 그대로 던진다** — 읽기 실패를 빈 결과로 위장하지 않는다
+ * (`readRowByRef`와 같은 원칙: 429가 404로 보여 원인 파악이 늦어진 사례, 2026-09-10).
+ * "탭이 아직 없음"만 조용히 넘기고 싶은 호출부는 `isMissingRangeError`로 걸러라.
+ */
+export async function readSheetRange(range: string): Promise<string[][]> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return [];
+  const sheets = google.sheets({ version: "v4", auth: getAuth() });
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range });
+  return (res.data.values as string[][] | null) ?? [];
+}
+
 /** 여러 셀을 한 번의 요청으로 쓴다 (values.batchUpdate). 반환: 갱신된 셀 수. */
 export async function batchUpdateCells(data: { range: string; values: string[][] }[]): Promise<number> {
   if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return 0;

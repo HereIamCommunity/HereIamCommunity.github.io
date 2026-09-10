@@ -321,6 +321,9 @@ export default function AdminShell({
             loading={loading}
             filters={listFilters}
             onFiltersChange={setListFilters}
+            apiFetch={apiFetch}
+            push={toasts.push}
+            onRefresh={onRefresh}
           />
         )}
         {tab === "stats" && <StatsTab stats={buildStats(rawRows)} loading={loading} />}
