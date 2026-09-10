@@ -249,7 +249,7 @@ export default function StayPage() {
                 linkLabel: "살롱 프로그램 →",
               },
               {
-                icon: "🏯",
+                icon: "🏛️",
                 title: "안동 헤리티지 투어",
                 desc: "봉정사와 하회마을, 병산서원과 낙동강을 천천히 둘러보는 세계문화유산 투어. 안동의 깊이를 경험하세요.",
                 link: "/andong",
