@@ -5,6 +5,7 @@ import BookingDrawer from "./BookingDrawer";
 import BookingList from "./BookingList";
 import BulkPanel from "./BulkPanel";
 import FilterGroup from "./FilterChips";
+import PeriodRange from "./PeriodRange";
 import type { ToastInput } from "./Toast";
 import type { ApiResult } from "./useAdminApi";
 import {
@@ -14,15 +15,19 @@ import {
   filterBookings,
   type AdminActions,
   type ListFilters,
+  type ListRange,
   type Period,
   type Row,
   type StatusFilter,
   type TypeFilter,
 } from "./shared";
 
-const PERIODS: Period[] = ["오늘", "이번 주", "이번 달", "전체"];
+const PERIODS: Period[] = ["오늘", "이번 주", "이번 달", "전체", "기간설정"];
 const TYPES: TypeFilter[] = ["전체", "살롱", "스테이"];
 const STATUSES: StatusFilter[] = ["전체", "입금대기", "확정", "취소"];
+
+/** 기간설정 칩을 처음 눌렀을 때의 기준 (AdminShell의 DEFAULT_FILTERS.range와 같아야 한다) */
+const DEFAULT_RANGE: ListRange = { basis: "usage" };
 
 /**
  * 목록 탭 — 필터 칩 + 일괄 처리 패널 + 리스트(모바일 행 / 데스크톱 표) + 상세 시트.
@@ -86,6 +91,10 @@ export default function ListTab({
             value={period}
             onChange={(v) => set("period", v as Period)}
           />
+          {/* 기간설정을 고른 동안만 칩 바로 아래 한 줄 — 값이 바뀌면 목록·상단 "N건"이 같이 움직인다 */}
+          {period === "기간설정" && (
+            <PeriodRange range={filters.range ?? DEFAULT_RANGE} onChange={(next) => set("range", next)} />
+          )}
         </div>
 
         <button
@@ -101,7 +110,14 @@ export default function ListTab({
 
       {bulkOpen && (
         <div id={bulkId}>
-          <BulkPanel apiFetch={apiFetch} push={push} onDone={onRefresh} todayISO={todayISO} />
+          <BulkPanel
+            apiFetch={apiFetch}
+            push={push}
+            onDone={onRefresh}
+            todayISO={todayISO}
+            listFilters={filters}
+            listCount={filtered.length}
+          />
         </div>
       )}
 

@@ -47,6 +47,8 @@ const DEFAULT_FILTERS: ListFilters = {
   typeFilter: "전체",
   statusFilter: "전체",
   searchInput: "",
+  // 기간설정 칩을 고르기 전까지는 쓰이지 않는다(period === "기간설정"일 때만 적용).
+  range: { basis: "usage" },
 };
 
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];

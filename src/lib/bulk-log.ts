@@ -8,7 +8,7 @@
  * 열: A jobId · B 시각(KST) · C 조건 JSON · D 동작 · E 알림 · F 건수 · G 스냅샷 JSON · H 되돌림
  */
 
-import type { BulkAction, BulkFilter, BulkSnapshotItem } from "@/lib/bulk";
+import type { BulkAction, BulkCondition, BulkSnapshotItem } from "@/lib/bulk";
 import { isSheetTab, type SheetTab } from "@/lib/row-ref";
 import {
   a1Tab,
@@ -31,7 +31,8 @@ export type BulkLogEntry = {
   jobId: string;
   /** KST "YYYY-MM-DD HH:mm:ss" */
   at: string;
-  filter: BulkFilter;
+  /** 실행에 쓴 조건 — 직접 조건(BulkFilter) 또는 현재 목록 조건(ListFilters) */
+  filter: BulkCondition;
   action: BulkAction;
   notify: boolean;
   count: number;
@@ -106,10 +107,10 @@ export function parseLogRow(row: string[], rowNum: number): BulkLogEntry | null 
   const jobId = (row?.[0] ?? "").trim();
   if (!jobId || jobId === BULK_LOG_HEADER[0]) return null;
 
-  let filter: BulkFilter = { status: "all", type: "all" };
+  let filter: BulkCondition = { status: "all", type: "all" };
   try {
     const f = JSON.parse(row[2] || "{}");
-    if (f && typeof f === "object") filter = f as BulkFilter;
+    if (f && typeof f === "object") filter = f as BulkCondition;
   } catch {
     /* 조건을 못 읽어도 되돌리기는 스냅샷만 있으면 된다 */
   }

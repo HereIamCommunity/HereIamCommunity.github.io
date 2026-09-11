@@ -7,7 +7,9 @@ import {
   parseBulkRequest,
   planBulkWrites,
   selectBulkTargets,
+  selectBulkTargetsFromList,
   summarizeBulkFilter,
+  type BulkCondition,
   type BulkTarget,
 } from "@/lib/bulk";
 import {
@@ -16,6 +18,7 @@ import {
   readBulkLog,
   MAX_BULK_TARGETS,
 } from "@/lib/bulk-log";
+import { kstToday } from "@/lib/digest";
 import { notifyBooking, notifyStatusText } from "@/lib/messaging";
 import { batchUpdateCells, getAllBookingsWithMeta } from "@/lib/sheets";
 import { postSlack } from "@/lib/slack";
@@ -26,11 +29,20 @@ import { refCellRange, type RowRef } from "@/lib/row-ref";
  * 일괄 처리 — 조건으로 대상을 고르고(preview) 한 번에 실행한다(run).
  *
  * body: { mode: "preview" | "run";
- *         filter: { usageBefore?: "YYYY-MM-DD"; usageAfter?: "YYYY-MM-DD";
- *                   status: "pending"|"confirmed"|"cancelled"|"all"; type: "all"|"salon"|"stay" };
+ *         // 조건은 아래 둘 중 **하나만** (둘 다 없거나 둘 다 있으면 400)
+ *         filter?: { usageBefore?: "YYYY-MM-DD"; usageAfter?: "YYYY-MM-DD";
+ *                    status: "pending"|"confirmed"|"cancelled"|"all"; type: "all"|"salon"|"stay" };
+ *         listFilters?: { period: "오늘"|"이번 주"|"이번 달"|"전체"|"기간설정";
+ *                         typeFilter: "전체"|"살롱"|"스테이";
+ *                         statusFilter: "전체"|"입금대기"|"확정"|"취소";
+ *                         searchInput?: string;
+ *                         range?: { basis: "usage"|"created"; from?: "YYYY-MM-DD"; to?: "YYYY-MM-DD" } };
  *         action: "confirm" | "cancel" | "reopen";
  *         notify?: boolean;      // 기본 false — 알림 없이 상태만 바꾼다
  *         jobId?: string }       // run 필수: preview가 준 값
+ *
+ * 응답에 `source: "list" | "filter"` — 어느 조건으로 대상을 골랐는지. `listFilters`면
+ * 화면과 **같은** `filterBookings`로 고르므로 목록 건수와 대상 건수가 일치한다.
  *
  * **쿼터 규약(중요)**: 2026-09-10 운영에서 99건을 건별 API로 돌렸다가 행마다 시트를 다시 읽어
  * 읽기 쿼터(429)에 걸렸다. 그래서 run은 **읽기 1회 + batchUpdate 1회**로 끝낸다.
@@ -80,20 +92,26 @@ export async function POST(req: NextRequest) {
   if (!parsed.ok) {
     return NextResponse.json({ ok: false, error: parsed.error }, { status: 400 });
   }
-  const { mode, filter, action, notify } = parsed.value;
+  const { mode, filter, listFilters, action, notify } = parsed.value;
+  const source: "list" | "filter" = listFilters ? "list" : "filter";
+  // 로그·슬랙에 남길 조건 — 목록 조건이면 ListFilters를 그대로 남긴다.
+  const condition: BulkCondition = listFilters ?? filter!;
 
   try {
     const now = new Date();
 
     // 읽기 1회 — 이 배열 하나로 preview·run 모두 계산한다.
     const { rows, meta } = await getAllBookingsWithMeta();
-    const targets = selectBulkTargets(rows, meta, filter, now);
+    const targets = listFilters
+      ? selectBulkTargetsFromList(rows, meta, listFilters, kstToday(), now)
+      : selectBulkTargets(rows, meta, filter!, now);
     const jobId = bulkJobId(targets.map((t) => t.ref));
 
     if (mode === "preview") {
       return NextResponse.json({
         ok: true,
         mode: "preview",
+        source,
         jobId,
         count: targets.length,
         byType: {
@@ -112,6 +130,7 @@ export async function POST(req: NextRequest) {
         {
           ok: false,
           error: "대상이 바뀌었어요. 미리보기를 다시 해주세요.",
+          source,
           jobId,
           count: targets.length,
         },
@@ -135,7 +154,7 @@ export async function POST(req: NextRequest) {
     if (plan.applied.length > 0) {
       try {
         logged = await appendBulkLog({
-          jobId, at, filter, action, notify,
+          jobId, at, filter: condition, action, notify,
           count: plan.applied.length,
           snapshot: plan.snapshot,
           reverted: "",
@@ -211,7 +230,7 @@ export async function POST(req: NextRequest) {
         buildSimpleBlocks(
           "📦 일괄 처리 실행",
           [
-            { label: "조건", value: summarizeBulkFilter(filter, action) },
+            { label: "조건", value: summarizeBulkFilter(condition, action) },
             { label: "처리", value: `${plan.applied.length}건` },
             { label: "건너뜀", value: `${plan.skipped.length}건` },
             { label: "알림", value: notify ? `보냄 ${notified}건 · 실패 ${failed.length}건` : "없음" },
@@ -227,6 +246,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       mode: "run",
+      source,
       jobId,
       at,
       updated: plan.applied.length,

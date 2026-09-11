@@ -6,8 +6,11 @@ import {
   planRevertWrites,
   parseBulkRequest,
   canApplyBulkWrites,
+  selectBulkTargetsFromList,
+  summarizeBulkFilter,
   type BulkFilter,
 } from "@/lib/bulk";
+import { filterBookings, type ListFilters } from "@/lib/list-filter";
 import type { RowMeta } from "@/lib/row-ref";
 
 /**
@@ -274,5 +277,142 @@ describe("canApplyBulkWrites", () => {
 
   it("적용할 행이 0건이면 로그 없이도 진행 (바꿀 게 없다)", () => {
     expect(canApplyBulkWrites(0, false)).toEqual({ ok: true });
+  });
+});
+
+/* ── 현재 목록 조건(listFilters) 기준 대상 선정 ─────────────── */
+
+describe("selectBulkTargetsFromList", () => {
+  const TODAY = "2026-09-10";
+  const base: ListFilters = {
+    period: "전체", typeFilter: "전체", statusFilter: "전체", searchInput: "",
+  };
+  /** 화면이 계산한 목록(= filterBookings 직접 호출)의 ref 집합 */
+  const listRefs = (f: ListFilters) =>
+    filterBookings(ROWS.slice(1), f, TODAY).map((row) => {
+      const i = ROWS.indexOf(row);
+      return `${META[i].tab}#${META[i].rowNum}`;
+    });
+  const serverRefs = (f: ListFilters) =>
+    selectBulkTargetsFromList(ROWS, META, f, TODAY, NOW).map((t) => `${t.ref.tab}#${t.ref.rowNum}`);
+
+  it("목록과 정확히 같은 행을 같은 순서로 고른다 (기간설정)", () => {
+    const f: ListFilters = {
+      ...base,
+      period: "기간설정",
+      range: { basis: "usage", from: "2026-09-01", to: "2026-09-10" },
+    };
+    expect(serverRefs(f)).toEqual(listRefs(f));
+    expect(serverRefs(f)).toEqual(["살롱#2", "스테이#2", "스테이#4"]);
+  });
+
+  it("상태·구분·검색 조건도 목록과 같게 반영한다", () => {
+    const f: ListFilters = { ...base, statusFilter: "입금대기", typeFilter: "살롱" };
+    expect(serverRefs(f)).toEqual(listRefs(f));
+    expect(serverRefs(f)).toEqual(["살롱#2", "살롱#3", "살롱#4"]);
+  });
+
+  it("사용일을 못 읽는 행도 목록에 보이면 대상이다 (건수가 어긋나면 안 된다)", () => {
+    expect(serverRefs(base)).toEqual(listRefs(base));
+    expect(serverRefs(base)).toContain("살롱#4"); // 빈살롱 — 사용일 불명
+    expect(serverRefs(base)).toHaveLength(ROWS.length - 1);
+  });
+
+  it("헤더 행은 대상이 아니다", () => {
+    expect(selectBulkTargetsFromList(ROWS, META, base, TODAY, NOW).map((t) => t.name)).not.toContain(
+      "이름"
+    );
+  });
+});
+
+describe("parseBulkRequest · listFilters", () => {
+  const listFilters = {
+    period: "기간설정",
+    typeFilter: "전체",
+    statusFilter: "입금대기",
+    searchInput: "",
+    range: { basis: "usage", from: "2026-08-01", to: "2026-09-10" },
+  };
+  const good = { mode: "preview", action: "confirm", listFilters };
+
+  it("listFilters만 주면 통과한다", () => {
+    const r = parseBulkRequest(good);
+    expect(r.ok && r.value.listFilters).toEqual(listFilters);
+    expect(r.ok && r.value.filter).toBeUndefined();
+  });
+
+  it("range 없는 기간설정도 통과 (열린 조건)", () => {
+    const r = parseBulkRequest({ ...good, listFilters: { ...listFilters, range: undefined } });
+    expect(r.ok).toBe(true);
+  });
+
+  it("searchInput이 없으면 빈 문자열로 채운다", () => {
+    const r = parseBulkRequest({
+      ...good,
+      listFilters: { period: "전체", typeFilter: "전체", statusFilter: "전체" },
+    });
+    expect(r.ok && r.value.listFilters?.searchInput).toBe("");
+  });
+
+  it("filter와 listFilters를 같이 주면 400", () => {
+    const r = parseBulkRequest({
+      ...good,
+      filter: { status: "pending", type: "all" },
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it("filter도 listFilters도 없으면 400", () => {
+    expect(parseBulkRequest({ mode: "preview", action: "confirm" }).ok).toBe(false);
+  });
+
+  it("모르는 period·typeFilter·statusFilter는 400", () => {
+    expect(parseBulkRequest({ ...good, listFilters: { ...listFilters, period: "작년" } }).ok).toBe(false);
+    expect(parseBulkRequest({ ...good, listFilters: { ...listFilters, typeFilter: "리트릿" } }).ok).toBe(false);
+    expect(parseBulkRequest({ ...good, listFilters: { ...listFilters, statusFilter: "대기" } }).ok).toBe(false);
+  });
+
+  it("range 형식·basis가 틀리면 400", () => {
+    const bad = (range: unknown) => parseBulkRequest({ ...good, listFilters: { ...listFilters, range } }).ok;
+    expect(bad({ basis: "usage", from: "2026-8-1" })).toBe(false);
+    expect(bad({ basis: "usage", to: "내일" })).toBe(false);
+    expect(bad({ basis: "체크인", from: "2026-08-01" })).toBe(false);
+    expect(bad({ from: "2026-08-01" })).toBe(false);
+    expect(bad("2026-08-01")).toBe(false);
+  });
+
+  it("listFilters도 run에는 jobId가 필요하다", () => {
+    expect(parseBulkRequest({ ...good, mode: "run" }).ok).toBe(false);
+    expect(parseBulkRequest({ ...good, mode: "run", jobId: "abc123abc123" }).ok).toBe(true);
+  });
+});
+
+describe("summarizeBulkFilter · listFilters", () => {
+  it("기간설정은 기준과 범위를 한 줄로", () => {
+    const s = summarizeBulkFilter(
+      {
+        period: "기간설정", typeFilter: "전체", statusFilter: "입금대기", searchInput: "",
+        range: { basis: "usage", from: "2026-08-01", to: "2026-09-10" },
+      },
+      "confirm"
+    );
+    expect(s).toContain("사용일 2026-08-01~2026-09-10");
+    expect(s).toContain("입금대기");
+    expect(s).toContain("→ 입금확인");
+  });
+
+  it("검색어가 있으면 포함됨을 밝힌다", () => {
+    const s = summarizeBulkFilter(
+      { period: "오늘", typeFilter: "살롱", statusFilter: "전체", searchInput: "김" },
+      "cancel"
+    );
+    expect(s).toContain("오늘");
+    expect(s).toContain("검색 \"김\"");
+  });
+
+  it("기존 filter 요약은 그대로다", () => {
+    expect(summarizeBulkFilter({ usageBefore: "2026-09-10", status: "pending", type: "all" }, "confirm")).toBe(
+      "2026-09-10 이전 · 입금대기 · 전체 · → 입금확인"
+    );
   });
 });

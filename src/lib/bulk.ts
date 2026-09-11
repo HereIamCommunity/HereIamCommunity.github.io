@@ -20,6 +20,14 @@ import { createHash } from "node:crypto";
 import { resolveStatusAction, type AdminAction } from "@/lib/admin-actions";
 import { parseAdminRow } from "@/lib/admin-row";
 import { isConfirmed, isPending } from "@/lib/digest";
+import {
+  filterBookings,
+  type ListFilters,
+  type ListRange,
+  type Period,
+  type StatusFilter,
+  type TypeFilter,
+} from "@/lib/list-filter";
 import { silentStatusText } from "@/lib/messaging";
 import { usageDateISO } from "@/lib/past-booking";
 import { refCellRange, type RowMeta, type RowRef } from "@/lib/row-ref";
@@ -125,6 +133,52 @@ export function selectBulkTargets(
   return out;
 }
 
+/**
+ * **현재 목록 조건** 기준 대상 선정 — 화면이 보고 있는 그 행들을 그대로 고른다.
+ *
+ * `rows`·`meta`는 `selectBulkTargets`와 같은 배열(헤더 포함·길이 동일).
+ * 목록 계산은 화면과 같은 `filterBookings`가 하고, 여기서는 정렬된 결과에 ref를 붙인다
+ * (헤더를 뺀 `rows.slice(1)`의 i는 `meta[i + 1]`에 대응 — 배열 참조로 이어 붙여 정렬 후에도 맞춘다).
+ *
+ * `selectBulkTargets`와 달리 **사용일 불명 행을 버리지 않는다**: 목록에 보이는 건수와
+ * 일괄 처리 대상 건수가 어긋나면 운영자가 잘못된 대상을 실행하게 된다.
+ * 날짜로 쓸어 담는 위험은 여기선 없다 — 대상이 화면에 그대로 보이기 때문이다.
+ */
+export function selectBulkTargetsFromList(
+  rows: string[][],
+  meta: RowMeta[],
+  filters: ListFilters,
+  todayISO: string,
+  now: Date = new Date()
+): BulkTarget[] {
+  const refByRow = new Map<string[], RowMeta>();
+  for (let i = 1; i < rows.length; i++) {
+    const ref = meta[i];
+    if (rows[i] && ref) refByRow.set(rows[i], ref);
+  }
+
+  const out: BulkTarget[] = [];
+  for (const row of filterBookings(rows.slice(1), filters, todayISO)) {
+    const ref = refByRow.get(row);
+    if (!ref) continue;
+    if (ref.rowNum < 2) continue;                                  // 헤더
+    if (ref.tab !== "살롱" && ref.tab !== "스테이") continue;
+
+    const booking = parseAdminRow(row);
+    out.push({
+      ref,
+      name: row[2] ?? "",
+      type: booking.type,
+      usage: usageDateISO(booking, now),                           // 불명이면 "" (제외하지 않는다)
+      status: (row[13] ?? "").trim(),
+      notify: row[14] ?? "",
+      row,
+    });
+  }
+
+  return out;
+}
+
 /* ─── 잡 식별자 ────────────────────────────────── */
 
 /**
@@ -194,13 +248,24 @@ export function planRevertWrites(
 
 export type BulkRequest = {
   mode: "preview" | "run";
-  filter: BulkFilter;
+  /** 직접 조건 — `listFilters`와 **둘 중 하나만** */
+  filter?: BulkFilter;
+  /** 현재 목록 조건 — 화면이 보고 있는 필터 그대로 */
+  listFilters?: ListFilters;
   action: BulkAction;
   /** 기본 false — 알림 없이 상태만 바꾸는 쪽이 안전한 기본값이다. */
   notify: boolean;
   /** run에서만 필수: preview가 준 잡 식별자 */
   jobId?: string;
 };
+
+/** 로그·요약이 다루는 조건 — 직접 조건이거나 목록 조건이거나. */
+export type BulkCondition = BulkFilter | ListFilters;
+
+/** 목록 조건인지 (직접 조건에는 period가 없다) */
+export function isListCondition(c: BulkCondition): c is ListFilters {
+  return !!c && typeof c === "object" && "period" in c;
+}
 
 export type BulkRequestParse =
   | { ok: true; value: BulkRequest }
@@ -216,10 +281,68 @@ function isTypeFilter(v: unknown): v is BulkTypeFilter {
   return v === "all" || v === "salon" || v === "stay";
 }
 
-/** `/api/admin/bulk` body 검증 (순수 함수). 틀리면 전부 400. */
+function isPeriod(v: unknown): v is Period {
+  return v === "오늘" || v === "이번 주" || v === "이번 달" || v === "전체" || v === "기간설정";
+}
+function isListTypeFilter(v: unknown): v is TypeFilter {
+  return v === "전체" || v === "살롱" || v === "스테이";
+}
+function isListStatusFilter(v: unknown): v is StatusFilter {
+  return v === "전체" || v === "입금대기" || v === "확정" || v === "취소";
+}
+
+/** 목록 조건(화면이 그대로 보낸 ListFilters) 검증 — 모르는 값은 전부 400. */
+function parseListFilters(v: unknown): { ok: true; value: ListFilters } | { ok: false; error: string } {
+  if (!v || typeof v !== "object") return { ok: false, error: "조건이 없습니다." };
+  const f = v as {
+    period?: unknown; typeFilter?: unknown; statusFilter?: unknown;
+    searchInput?: unknown; range?: unknown;
+  };
+  if (!isPeriod(f.period)) return { ok: false, error: "알 수 없는 기간 조건입니다." };
+  if (!isListTypeFilter(f.typeFilter)) return { ok: false, error: "알 수 없는 구분 조건입니다." };
+  if (!isListStatusFilter(f.statusFilter)) return { ok: false, error: "알 수 없는 상태 조건입니다." };
+  if (f.searchInput !== undefined && typeof f.searchInput !== "string") {
+    return { ok: false, error: "검색어 형식이 올바르지 않습니다." };
+  }
+
+  const value: ListFilters = {
+    period: f.period,
+    typeFilter: f.typeFilter,
+    statusFilter: f.statusFilter,
+    searchInput: typeof f.searchInput === "string" ? f.searchInput : "",
+  };
+
+  if (f.range !== undefined && f.range !== null) {
+    if (typeof f.range !== "object") return { ok: false, error: "기간 형식이 올바르지 않습니다." };
+    const r = f.range as { basis?: unknown; from?: unknown; to?: unknown };
+    if (r.basis !== "usage" && r.basis !== "created") {
+      return { ok: false, error: "기간 기준은 사용일 또는 신청일이어야 합니다." };
+    }
+    const range: ListRange = { basis: r.basis };
+    for (const k of ["from", "to"] as const) {
+      const d = r[k];
+      if (d === undefined || d === null || d === "") continue;
+      if (typeof d !== "string" || !ISO_DATE.test(d)) {
+        return { ok: false, error: "날짜는 YYYY-MM-DD 형식이어야 합니다." };
+      }
+      range[k] = d;
+    }
+    value.range = range;
+  }
+
+  return { ok: true, value };
+}
+
+/**
+ * `/api/admin/bulk` body 검증 (순수 함수). 틀리면 전부 400.
+ *
+ * 대상 조건은 `filter`(직접 조건) 또는 `listFilters`(현재 목록 조건) **둘 중 하나**다.
+ * 둘 다 없거나 둘 다 있으면 400 — 어느 쪽으로 계산했는지 애매한 채로 실행하면 안 된다.
+ */
 export function parseBulkRequest(body: unknown): BulkRequestParse {
   const b = (body ?? {}) as {
-    mode?: unknown; filter?: unknown; action?: unknown; notify?: unknown; jobId?: unknown;
+    mode?: unknown; filter?: unknown; listFilters?: unknown;
+    action?: unknown; notify?: unknown; jobId?: unknown;
   };
 
   if (b.mode !== "preview" && b.mode !== "run") {
@@ -228,24 +351,40 @@ export function parseBulkRequest(body: unknown): BulkRequestParse {
   if (!isBulkAction(b.action)) {
     return { ok: false, error: "알 수 없는 동작입니다." };
   }
-  if (!b.filter || typeof b.filter !== "object") {
+
+  const hasFilter = b.filter !== undefined && b.filter !== null;
+  const hasList = b.listFilters !== undefined && b.listFilters !== null;
+  if (hasFilter && hasList) {
+    return { ok: false, error: "조건은 한 가지만 보내주세요. (filter · listFilters)" };
+  }
+  if (!hasFilter && !hasList) {
     return { ok: false, error: "조건이 없습니다." };
   }
 
-  const f = b.filter as {
-    usageBefore?: unknown; usageAfter?: unknown; status?: unknown; type?: unknown;
-  };
-  if (!isStatusFilter(f.status)) return { ok: false, error: "알 수 없는 상태 조건입니다." };
-  if (!isTypeFilter(f.type)) return { ok: false, error: "알 수 없는 구분 조건입니다." };
+  let filter: BulkFilter | undefined;
+  let listFilters: ListFilters | undefined;
 
-  const filter: BulkFilter = { status: f.status, type: f.type };
-  for (const k of ["usageBefore", "usageAfter"] as const) {
-    const v = f[k];
-    if (v === undefined || v === null || v === "") continue;
-    if (typeof v !== "string" || !ISO_DATE.test(v)) {
-      return { ok: false, error: "날짜는 YYYY-MM-DD 형식이어야 합니다." };
+  if (hasFilter) {
+    if (typeof b.filter !== "object") return { ok: false, error: "조건이 없습니다." };
+    const f = b.filter as {
+      usageBefore?: unknown; usageAfter?: unknown; status?: unknown; type?: unknown;
+    };
+    if (!isStatusFilter(f.status)) return { ok: false, error: "알 수 없는 상태 조건입니다." };
+    if (!isTypeFilter(f.type)) return { ok: false, error: "알 수 없는 구분 조건입니다." };
+
+    filter = { status: f.status, type: f.type };
+    for (const k of ["usageBefore", "usageAfter"] as const) {
+      const v = f[k];
+      if (v === undefined || v === null || v === "") continue;
+      if (typeof v !== "string" || !ISO_DATE.test(v)) {
+        return { ok: false, error: "날짜는 YYYY-MM-DD 형식이어야 합니다." };
+      }
+      filter[k] = v;
     }
-    filter[k] = v;
+  } else {
+    const parsed = parseListFilters(b.listFilters);
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    listFilters = parsed.value;
   }
 
   const jobId = typeof b.jobId === "string" && b.jobId ? b.jobId : undefined;
@@ -257,7 +396,8 @@ export function parseBulkRequest(body: unknown): BulkRequestParse {
     ok: true,
     value: {
       mode: b.mode,
-      filter,
+      ...(filter ? { filter } : {}),
+      ...(listFilters ? { listFilters } : {}),
       action: b.action,
       notify: b.notify === true,
       ...(jobId ? { jobId } : {}),
@@ -286,18 +426,38 @@ export function canApplyBulkWrites(
   return { ok: true };
 }
 
-/** 조건을 사람이 읽는 한 줄로 — 로그·목록 표시용. */
-export function summarizeBulkFilter(filter: BulkFilter, action: BulkAction): string {
+const ACTION_TEXT: Record<BulkAction, string> = {
+  confirm: "입금확인", cancel: "취소", reopen: "되돌리기",
+};
+
+/** 기간설정 범위 — 한쪽만 있으면 열린 구간 그대로 보여준다. */
+function rangeText(range: ListRange | undefined): string {
+  if (!range) return "기간설정";
+  const basis = range.basis === "usage" ? "사용일" : "신청일";
+  if (!range.from && !range.to) return `${basis} 전체`;
+  return `${basis} ${range.from ?? ""}~${range.to ?? ""}`;
+}
+
+/** 조건을 사람이 읽는 한 줄로 — 로그·목록 표시용. 직접 조건·목록 조건 둘 다 받는다. */
+export function summarizeBulkFilter(cond: BulkCondition, action: BulkAction): string {
+  if (isListCondition(cond)) {
+    const q = (cond.searchInput ?? "").trim();
+    return [
+      cond.period === "기간설정" ? rangeText(cond.range) : cond.period,
+      cond.statusFilter === "전체" ? "전체상태" : cond.statusFilter,
+      cond.typeFilter,
+      q ? `검색 "${q}"` : "검색어 없음",
+      `→ ${ACTION_TEXT[action]}`,
+    ].join(" · ");
+  }
+
   const STATUS: Record<BulkStatusFilter, string> = {
     pending: "입금대기", confirmed: "확정", cancelled: "취소", all: "전체상태",
   };
   const TYPE: Record<BulkTypeFilter, string> = { all: "전체", salon: "살롱", stay: "스테이" };
-  const ACTION: Record<BulkAction, string> = {
-    confirm: "입금확인", cancel: "취소", reopen: "되돌리기",
-  };
   const parts: string[] = [];
-  if (filter.usageBefore) parts.push(`${filter.usageBefore} 이전`);
-  if (filter.usageAfter) parts.push(`${filter.usageAfter} 이후`);
-  parts.push(STATUS[filter.status], TYPE[filter.type], `→ ${ACTION[action]}`);
+  if (cond.usageBefore) parts.push(`${cond.usageBefore} 이전`);
+  if (cond.usageAfter) parts.push(`${cond.usageAfter} 이후`);
+  parts.push(STATUS[cond.status], TYPE[cond.type], `→ ${ACTION_TEXT[action]}`);
   return parts.join(" · ");
 }

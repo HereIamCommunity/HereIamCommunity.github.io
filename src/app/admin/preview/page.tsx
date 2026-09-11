@@ -9,14 +9,17 @@ import AdminShell from "../_components/AdminShell";
 import Banner from "../_components/Banner";
 import { useToasts } from "../_components/Toast";
 import type { RowRef, SheetTab } from "@/lib/row-ref";
-import type { BulkActionKey, BulkFilter, BulkJob } from "../_components/BulkPanel";
+import { summarizeListFilters } from "../_components/BulkPanel";
+import type { BulkActionKey, BulkFilter, BulkJob, BulkSource } from "../_components/BulkPanel";
 import type { ApiResult } from "../_components/useAdminApi";
 import {
+  filterBookings,
   registerRowRefs,
   rowKey,
   rowRef,
   type AdminActions,
   type DateRange,
+  type ListFilters,
   type Row,
   type SheetKind,
 } from "../_components/shared";
@@ -175,12 +178,36 @@ function selectTargets(rows: Row[], filter: BulkFilter, now: Date): Target[] {
   return out;
 }
 
+/**
+ * "현재 목록 조건"(9장) — 실제 서버도 `filterBookings(rows.slice(1), listFilters, kstToday())`로
+ * 대상을 고른다. 화면의 목록 건수와 여기서 센 건수가 **정의상 같아야** 하고, 그래서
+ * 패널의 목록/대상 대조가 미리보기에서도 의미를 갖는다.
+ */
+function listTargets(rows: Row[], filters: ListFilters, now: Date): Target[] {
+  return filterBookings(rows, filters, kstToday()).map((row) => {
+    const booking = parseAdminRow(row);
+    return {
+      row,
+      ref: rowRef(row) ?? "행 정보 없음",
+      name: row[2] ?? "",
+      type: booking.type,
+      // 목록 조건은 사용일 불명 행도 대상에 남긴다 — 표시만 "—"가 된다.
+      usage: usageDateISO(booking, now) || "",
+      status: (row[13] ?? "").trim(),
+    };
+  });
+}
+
 /** 대상 ref 목록으로 만드는 가짜 jobId (서버는 sha256 앞 12자) */
 function fakeJobId(targets: Target[]): string {
   const key = targets.map((t) => JSON.stringify(t.ref)).sort().join("|");
   let h = 5381;
   for (let i = 0; i < key.length; i++) h = ((h << 5) + h + key.charCodeAt(i)) >>> 0;
   return `preview-${h.toString(16)}-${targets.length}`;
+}
+
+function summaryOfList(filters: ListFilters, action: BulkActionKey): string {
+  return `${summarizeListFilters(filters)} · → ${ACTION_TEXT[action]}`;
 }
 
 function summaryOf(filter: BulkFilter, action: BulkActionKey): string {
@@ -295,17 +322,24 @@ export default function AdminPreviewPage() {
         const body = JSON.parse(String(init.body ?? "{}")) as {
           mode?: string;
           filter?: BulkFilter;
+          listFilters?: ListFilters;
           action?: BulkActionKey;
           notify?: boolean;
           jobId?: string;
         };
         const filter = body.filter;
+        const listFilters = body.listFilters;
         const action = body.action ?? "confirm";
-        if (!filter) return { ok: false, status: 400, data: { error: "조건이 없어요." } };
+        // 서버도 filter·listFilters 중 하나는 반드시 있어야 400이 아니다
+        if (!filter && !listFilters) return { ok: false, status: 400, data: { error: "조건이 없어요." } };
 
         const now = new Date();
-        const targets = selectTargets(rawRows.slice(1), filter, now);
+        const source: BulkSource = listFilters ? "list" : "filter";
+        const targets = listFilters
+          ? listTargets(rawRows.slice(1), listFilters, now)
+          : selectTargets(rawRows.slice(1), filter!, now);
         const jobId = fakeJobId(targets);
+        const summary = listFilters ? summaryOfList(listFilters, action) : summaryOf(filter!, action);
 
         if (body.mode === "preview") {
           return {
@@ -314,6 +348,7 @@ export default function AdminPreviewPage() {
             data: {
               ok: true,
               mode: "preview",
+              source,
               jobId,
               count: targets.length,
               byType: {
@@ -353,7 +388,8 @@ export default function AdminPreviewPage() {
           {
             jobId,
             at: nowLabel(now),
-            summary: summaryOf(filter, action),
+            summary,
+            source,
             action,
             notify: !!body.notify,
             count: applied.length,
@@ -368,6 +404,7 @@ export default function AdminPreviewPage() {
           data: {
             ok: true,
             mode: "run",
+            source,
             jobId,
             at: nowLabel(now),
             updated: applied.length,
