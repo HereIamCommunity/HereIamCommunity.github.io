@@ -272,3 +272,28 @@ typecheck/test/eslint/build + preview 페이지에서 패널 열고 미리보기
 
 ### 화면 (Esther) — 설정 탭
 - "슬랙 알림" 카드: 설정 여부(토큰·채널) 체크리스트, [슬랙 테스트 보내기] 버튼(확인 단계 없음, 요금 없음), 안내 문구 "슬랙 미설정 시 호스트 문자로 나갑니다".
+
+## 9. 기간설정 + "현재 목록 기준" 일괄 처리 (2026-09-11 운영 요청)
+
+운영자가 신청 리스트에서 **날짜 범위로 걸러 본 뒤, 보이는 그 건들을 그대로 일괄 처리**한다. 목록 건수와 일괄 처리 대상이 정확히 같아야 하므로 필터 계산 함수를 서버·화면이 공유한다.
+
+### 화면 (Esther)
+- 기간 칩에 **`기간설정`** 추가: `오늘 | 이번 주 | 이번 달 | 전체 | 기간설정`. 선택하면 그 아래 한 줄:
+  `기준 [○ 사용일  ○ 신청일]   [2026-08-01] ~ [2026-09-10]   (양쪽 포함)`
+  - 기준 기본값 **사용일**(스테이=체크인, 살롱=일시). 시작 또는 종료 한쪽만 넣어도 됨(열린 구간).
+  - 날짜 input은 `FIELD` 높이(44px), md 미만은 세로 스택. 값이 바뀌면 목록 즉시 반영, 상단 검색 "N건"도 동일 함수.
+- 일괄 처리 패널에 **대상 소스 토글** 최상단: `● 현재 목록 조건 (N건)  ○ 직접 조건`
+  - 현재 목록 조건: 조건 UI를 숨기고 요약 한 줄("사용일 2026-08-01~09-10 · 입금대기 · 전체 · 검색어 없음")만. 검색어가 있으면 포함됨을 명시. 미리보기 → 서버가 같은 `ListFilters`로 계산 → 건수가 목록과 같은지 화면에서 대조해 다르면 경고("목록 N건 / 대상 M건 — 새로고침 후 다시 시도").
+  - 직접 조건: 기존 패널 그대로.
+- 기간설정 range는 `ListFilters`에 포함되어 탭 왕복에도 유지. 딥링크 `?tab=list`만 유지(쿼리에 range는 넣지 않음).
+
+### 공유 필터 (Max) — `src/lib/list-filter.ts`
+- `shared.ts`의 `Period`/`TypeFilter`/`StatusFilter`/`ListFilters`/`inPeriod`/`bookingStatus`/`matchStatusFilter`/`filterBookings`/`byCreatedDesc`를 **`src/lib/list-filter.ts`로 이동**하고 `shared.ts`는 re-export만 남긴다(화면 import 경로 불변). 순수·브라우저 안전(node 전용 import 금지 — `node:crypto` 등 끌어오면 클라 번들 깨짐).
+- `ListFilters`에 추가: `range?: { basis: "usage" | "created"; from?: string; to?: string }` (YYYY-MM-DD, 양끝 포함). `period === "기간설정"`일 때만 적용. `Period` 유니온에 `"기간설정"` 추가.
+- 사용일은 `usageDateISO`(past-booking.ts) 재사용, 신청일은 `parseSheetDateTime` → ISO. 사용일/신청일을 못 읽는 행은 range 조건에서 **제외**.
+- `filterBookings(rows, filters, todayISO)` 시그니처 유지.
+
+### API (Max) — `POST /api/admin/bulk`
+- body에 `filter` 대신 `listFilters: ListFilters` 허용(둘 중 하나 필수). `listFilters`면 서버가 `getAllBookingsWithMeta` → `filterBookings(rows.slice(1), listFilters, kstToday())`로 대상 계산(정렬 포함) → 이후 jobId·plan·run·log 동일. 응답에 `source: "list" | "filter"`, 로그 조건 JSON에도 `listFilters` 그대로.
+- `summarizeBulkFilter`가 `listFilters`도 요약(기간설정이면 "사용일 8/1~9/10").
+- 테스트: list-filter.test.ts(range 경계 양끝 포함·한쪽 열림·basis 2종·불명 제외·기존 period 회귀), bulk 요청 파싱(listFilters 검증: period 값·range 형식·basis), preview가 화면 필터 결과와 동일한 행 집합(같은 샘플로 `filterBookings` 직접 호출 == 서버 선택).
