@@ -18,6 +18,8 @@ import {
   TD_CELL,
   TH_CELL,
   shortDate,
+  type ListFilters,
+  type ListRange,
 } from "./shared";
 
 /* ── 일괄 처리 패널 (7장) ────────────────────────────────
@@ -27,11 +29,18 @@ import {
    1) 대상 건수는 **서버가 센다.** 화면에서 따로 세면 실행 대상과 어긋날 수 있고,
       그 어긋남이 곧 "엉뚱한 99명에게 알림톡"이 된다. 미리보기 응답의 jobId를 실행에
       그대로 돌려줘 서버가 같은 대상인지 다시 확인한다(다르면 409).
-   2) 조건을 하나라도 건드리면 미리보기는 무효다. [실행]은 즉시 잠기고 다시 세라고 말한다. */
+   2) 조건을 하나라도 건드리면 미리보기는 무효다. [실행]은 즉시 잠기고 다시 세라고 말한다.
+
+   9장에서 대상 소스가 둘로 나뉘었다:
+   - **현재 목록 조건** — 지금 목록 탭이 보여주는 그 건들. 화면·서버가 `filterBookings`
+     한 함수를 공유하므로 건수가 같아야 정상이고, **다르면 실행을 잠근다**(아래 mismatch).
+   - **직접 조건** — 사용일/상태/구분을 이 패널에서 따로 고르는 기존 흐름. */
 
 export type BulkStatusFilter = "pending" | "confirmed" | "cancelled" | "all";
 export type BulkTypeFilter = "all" | "salon" | "stay";
 export type BulkActionKey = "confirm" | "cancel" | "reopen";
+/** 일괄 처리 대상을 어디서 가져오는지 (9장) */
+export type BulkSource = "list" | "filter";
 
 export type BulkFilter = {
   usageBefore?: string;
@@ -62,6 +71,8 @@ export type BulkRunResult = {
   failed?: BulkFailed[];
   /** false면 되돌리기 스냅샷이 안 남았다는 뜻 */
   logged?: boolean;
+  /** 대상을 무엇으로 골랐는지 — "list"면 현재 목록 조건 */
+  source?: BulkSource;
 };
 /** `reverted`는 되돌린 시각 문자열("" = 아직) */
 export type BulkJob = {
@@ -72,6 +83,7 @@ export type BulkJob = {
   notify?: boolean;
   count: number;
   reverted: string | boolean;
+  source?: BulkSource;
 };
 
 /** 목록에 그리는 최대 행 수 — 그 위로는 세로로만 스크롤한다 */
@@ -143,6 +155,31 @@ function jobTime(at: string): string {
   return m ? `${Number(m[1])}/${Number(m[2])} ${m[3]}` : (at ?? "");
 }
 
+/** 기간설정 한 줄 요약 — "사용일 2026-08-01~2026-09-10" / 한쪽만 넣었으면 "…부터"·"…까지" */
+function rangeText(range: ListRange | undefined): string {
+  const basis = range?.basis === "created" ? "신청일" : "사용일";
+  const from = range?.from?.trim();
+  const to = range?.to?.trim();
+  if (from && to) return `${basis} ${from}~${to}`;
+  if (from) return `${basis} ${from}부터`;
+  if (to) return `${basis} ${to}까지`;
+  return `${basis} 기간 미지정`;
+}
+
+/**
+ * 목록 탭 필터를 사람이 읽는 한 줄로. 검색어는 대상을 크게 줄이는데도 칩처럼 눈에 띄지
+ * 않아서, 걸려 있으면 **반드시 문장에 적는다**.
+ * preview 페이지의 가짜 API도 최근 기록 요약에 같은 문장을 쓴다.
+ */
+export function summarizeListFilters(f: ListFilters): string {
+  const period =
+    f.period === "기간설정" ? rangeText(f.range) : f.period === "전체" ? "전체 기간" : `${f.period} 신청`;
+  const status = f.statusFilter === "전체" ? "전체 상태" : f.statusFilter;
+  const type = f.typeFilter === "전체" ? "살롱·스테이" : f.typeFilter;
+  const q = f.searchInput.trim();
+  return `${period} · ${status} · ${type} · ${q ? `검색어 ‘${q}’ 포함` : "검색어 없음"}`;
+}
+
 function errorOf(data: unknown, fallback: string): string {
   const e = (data as { error?: unknown } | null)?.error;
   return typeof e === "string" && e ? e : fallback;
@@ -153,16 +190,26 @@ export default function BulkPanel({
   push,
   onDone,
   todayISO,
+  listFilters,
+  listCount,
 }: {
   apiFetch: (path: string, init?: RequestInit) => Promise<ApiResult>;
   push: (t: ToastInput) => void;
   /** 실행·되돌리기 뒤 목록 재조회 */
   onDone: () => void;
   todayISO: string;
+  /** 목록 탭이 지금 쓰고 있는 필터 — "현재 목록 조건"으로 그대로 서버에 넘긴다 */
+  listFilters: ListFilters;
+  /** 그 필터로 화면이 실제로 그린 건수 — 서버가 센 대상 수와 대조한다 */
+  listCount: number;
 }) {
   const listId = useId();
   const failedId = useId();
   const skippedId = useId();
+
+  const sourceName = useId();
+  // 9장의 기본값은 "현재 목록 조건" — 목록에서 걸러 본 걸 그대로 처리하는 게 이 기능의 시작이다.
+  const [source, setSource] = useState<BulkSource>("list");
 
   const [dir, setDir] = useState<"before" | "after">("before");
   const [date, setDate] = useState(todayISO);
@@ -193,13 +240,29 @@ export default function BulkPanel({
     [status, type, dir, date]
   );
 
+  /** 서버로 보내는 대상 지정 — 소스에 따라 `listFilters`나 `filter` 한쪽만 실린다 */
+  const targetBody = useMemo(
+    () => (source === "list" ? { listFilters } : { filter }),
+    [source, listFilters, filter]
+  );
+
   /** 대상이 달라지는 조건 + 동작. 알림 여부는 대상을 바꾸지 않으므로 뺀다. */
-  const conditionKey = useMemo(() => JSON.stringify({ filter, action }), [filter, action]);
+  const conditionKey = useMemo(
+    () => JSON.stringify({ source, ...targetBody, action }),
+    [source, targetBody, action]
+  );
   const stale = !!preview && preview.key !== conditionKey;
   const tooMany = !!preview && preview.data.count > MAX_TARGETS;
-  const ready = !!preview && !stale && preview.data.count > 0 && !tooMany;
+  /**
+   * 목록 건수 ≠ 서버가 센 대상 수. 같은 `filterBookings`를 쓰는데 갈라졌다는 건 화면이
+   * 들고 있는 데이터가 이미 낡았다는 뜻이라, 여기서 실행을 막는다.
+   */
+  const mismatch = !!preview && !stale && source === "list" && preview.data.count !== listCount;
+  const ready = !!preview && !stale && preview.data.count > 0 && !tooMany && !mismatch;
 
-  const conditionLine = `사용일 ${date} ${dir === "before" ? "이전" : "이후"} · ${STATUS_LABEL[status]} · ${TYPE_LABEL[type]}`;
+  const filterLine = `사용일 ${date} ${dir === "before" ? "이전" : "이후"} · ${STATUS_LABEL[status]} · ${TYPE_LABEL[type]}`;
+  const listLine = summarizeListFilters(listFilters);
+  const conditionLine = source === "list" ? listLine : filterLine;
 
   const loadJobs = useCallback(async () => {
     setJobsError("");
@@ -225,7 +288,7 @@ export default function BulkPanel({
     setShowSkipped(false);
     const res = await apiFetch("/api/admin/bulk", {
       method: "POST",
-      body: JSON.stringify({ mode: "preview", filter, action, notify: !silent }),
+      body: JSON.stringify({ mode: "preview", ...targetBody, action, notify: !silent }),
     });
     setPreviewing(false);
     const d = res.data as (BulkPreview & { ok?: boolean }) | null;
@@ -236,7 +299,7 @@ export default function BulkPanel({
     }
     setPreview({ key: conditionKey, data: d });
     setShowRows(false);
-  }, [apiFetch, filter, action, silent, conditionKey]);
+  }, [apiFetch, targetBody, action, silent, conditionKey]);
 
   const doRun = useCallback(
     // 이름 있는 함수 표현식 — 실패 토스트의 [다시 시도]가 자기 자신을 그대로 다시 부른다
@@ -244,7 +307,7 @@ export default function BulkPanel({
       setRunning(true);
       const res = await apiFetch("/api/admin/bulk", {
         method: "POST",
-        body: JSON.stringify({ mode: "run", filter, action, notify: !silent, jobId }),
+        body: JSON.stringify({ mode: "run", ...targetBody, action, notify: !silent, jobId }),
       });
       setRunning(false);
       const d = res.data as (BulkRunResult & { ok?: boolean }) | null;
@@ -271,18 +334,20 @@ export default function BulkPanel({
 
       const failedCount = d.failed?.length ?? 0;
       const skippedCount = d.skipped?.length ?? 0;
-      setResult(d);
+      // 서버가 source를 돌려주면 그 값이 사실이고, 아니면 화면이 고른 소스를 그대로 쓴다.
+      const usedList = (d.source ?? source) === "list";
+      setResult({ ...d, source: usedList ? "list" : "filter" });
       setShowFailed(false);
       setShowSkipped(false);
       setPreview(null);
       push({
         kind: failedCount > 0 ? "error" : "ok",
-        text: `일괄 ${ACTION_LABEL[action]} — 성공 ${d.updated}건 · 건너뜀 ${skippedCount}건 · 실패 ${failedCount}건`,
+        text: `일괄 ${ACTION_LABEL[action]}${usedList ? " (현재 목록 기준)" : ""} — 성공 ${d.updated}건 · 건너뜀 ${skippedCount}건 · 실패 ${failedCount}건`,
       });
       await loadJobs();
       onDone();
     },
-    [apiFetch, filter, action, silent, push, loadJobs, onDone, doPreview]
+    [apiFetch, targetBody, source, action, silent, push, loadJobs, onDone, doPreview]
   );
 
   const doRevert = useCallback(
@@ -330,7 +395,43 @@ export default function BulkPanel({
         <fieldset disabled={running} className="mt-4 space-y-3">
           <legend className="sr-only">일괄 처리 조건과 동작</legend>
 
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          {/* 대상 소스 — 패널 최상단. 무엇을 처리하는지가 어떤 동작인지보다 먼저다. */}
+          <fieldset>
+            <legend className="sr-only">일괄 처리 대상 고르기</legend>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="whitespace-nowrap text-xs font-medium text-gray-700">대상</span>
+              {(
+                [
+                  { key: "list", label: `현재 목록 조건 (${listCount}건)` },
+                  { key: "filter", label: "직접 조건" },
+                ] as const
+              ).map((o) => (
+                <label key={o.key} className="flex h-11 items-center gap-2 whitespace-nowrap text-sm text-brown">
+                  <input
+                    type="radio"
+                    name={sourceName}
+                    value={o.key}
+                    checked={source === o.key}
+                    onChange={() => setSource(o.key)}
+                    className="h-4 w-4 accent-orange-dark"
+                  />
+                  {o.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          {/* 현재 목록 조건이면 조건 칸을 아예 감추고, 지금 걸려 있는 필터를 한 줄로 되읽어준다 */}
+          {source === "list" && (
+            <div className="rounded-lg border border-gray-200 bg-cream/60 p-3">
+              <p className="text-sm leading-6 break-keep text-brown">{listLine}</p>
+              <p className="mt-1 text-xs leading-5 break-keep text-gray-700">
+                지금 목록에 보이는 {listCount}건이 그대로 대상이에요. 위쪽 칩·검색어를 바꾸면 대상도 같이 바뀝니다.
+              </p>
+            </div>
+          )}
+
+          <div className={`grid gap-3 md:grid-cols-2 lg:grid-cols-4 ${source === "list" ? "hidden" : ""}`}>
             <fieldset className="lg:col-span-2">
               <legend className="mb-1.5 text-xs font-medium text-gray-700">사용일 기준</legend>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -450,6 +551,17 @@ export default function BulkPanel({
           </div>
         )}
 
+        {mismatch && (
+          <div className="mt-3">
+            <Banner
+              tone="error"
+              title={`목록 ${listCount}건 / 대상 ${count}건 — 숫자가 달라요`}
+              detail="화면이 들고 있는 목록이 시트보다 낡았다는 뜻이에요. 새로고침한 뒤 미리보기를 다시 해주세요. 두 숫자가 같아지기 전까지는 실행할 수 없어요."
+              action={{ label: "새로고침", onClick: onDone }}
+            />
+          </div>
+        )}
+
         <div className="mt-4 border-t border-gray-200 pt-4">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <button type="button" onClick={() => void doPreview()} disabled={running || previewing} className={BTN_OUTLINE}>
@@ -478,6 +590,10 @@ export default function BulkPanel({
               ) : tooMany ? (
                 <span className="text-brown tabular-nums">
                   {count}건 — 한 번에 {MAX_TARGETS}건까지만 처리할 수 있어요. 날짜를 좁혀주세요.
+                </span>
+              ) : mismatch ? (
+                <span className="text-brown tabular-nums">
+                  목록 {listCount}건 / 대상 {count}건 — 새로고침 후 다시 시도해주세요.
                 </span>
               ) : (
                 <span className="tabular-nums">
@@ -584,6 +700,7 @@ export default function BulkPanel({
         {result && (
           <div className="mt-4 rounded-xl border border-gray-200 bg-cream/70 p-4">
             <p className="text-sm break-keep text-brown">
+              {result.source === "list" && <span className="text-gray-700">현재 목록 기준 · </span>}
               <span className="font-medium tabular-nums">성공 {result.updated}건</span>
               <span className="text-gray-700 tabular-nums">
                 {" · "}건너뜀 {skippedList.length}건 · 실패 {failedList.length}건
@@ -672,7 +789,10 @@ export default function BulkPanel({
                 >
                   {jobTime(job.at)}
                 </span>
-                <span className="min-w-0 flex-1 text-sm break-keep text-brown">{job.summary}</span>
+                <span className="min-w-0 flex-1 text-sm break-keep text-brown">
+                  {job.source === "list" && <span className="text-gray-700">현재 목록 기준 · </span>}
+                  {job.summary}
+                </span>
                 <span className="shrink-0 whitespace-nowrap text-xs text-gray-700 tabular-nums">{job.count}건</span>
                 {job.reverted ? (
                   <span

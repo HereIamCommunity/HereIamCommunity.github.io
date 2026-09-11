@@ -1,4 +1,4 @@
-import { isConfirmed, isPending, normalizeDate, parseSheetDateTime } from "@/lib/digest";
+import { normalizeDate, parseSheetDateTime } from "@/lib/digest";
 import type { RowRef } from "@/lib/row-ref";
 
 /** 시트 한 행 (예약 A~O · 리트릿 A~M · 무료개방 A~L) */
@@ -65,11 +65,6 @@ export function rowKey(sheet: SheetKind, row: Row): string {
   return `${sheet}:${row[0] ?? ""}|${phone ?? ""}`;
 }
 
-/** 예약 행의 상태(N열). 빈값은 "신청"으로 본다. */
-export function bookingStatus(row: Row): string {
-  return (row[13] ?? "").trim() || "신청";
-}
-
 export function retreatStatus(row: Row): string {
   return (row[12] ?? "").trim() || "신청";
 }
@@ -126,16 +121,6 @@ export function createdTime(raw: string | undefined): number | null {
   return parseSheetDateTime(raw ?? "")?.getTime() ?? null;
 }
 
-/** 신청일 내림차순. 신청일시를 못 읽는 행은 순서와 상관없이 맨 아래. */
-export function byCreatedDesc(a: Row, b: Row): number {
-  const ta = createdTime(a[0]);
-  const tb = createdTime(b[0]);
-  if (ta === null && tb === null) return 0;
-  if (ta === null) return 1;
-  if (tb === null) return -1;
-  return tb - ta;
-}
-
 /** 연락처를 tel: 링크용으로 정리 */
 export function telHref(phone: string | undefined): string {
   return `tel:${(phone ?? "").replace(/[^0-9+]/g, "")}`;
@@ -173,61 +158,24 @@ export function parseNotifyCell(cell: string | undefined): { kind: NotifyKind; t
   return { kind: "none", text: raw };
 }
 
-export type Period = "오늘" | "이번 주" | "이번 달" | "전체";
-export type TypeFilter = "전체" | "살롱" | "스테이";
-export type StatusFilter = "전체" | "입금대기" | "확정" | "취소";
-
-/** 목록 탭 필터 — 탭을 왕복해도 유지되도록 AdminShell이 들고 있는다 */
-export type ListFilters = {
-  period: Period;
-  typeFilter: TypeFilter;
-  statusFilter: StatusFilter;
-  searchInput: string;
-};
-
-/** 신청일시 기준 기간 필터 */
-export function inPeriod(createdAt: string, period: Period, todayISO: string): boolean {
-  if (period === "전체") return true;
-  const d = parseSheetDateTime(createdAt ?? "");
-  if (!d) return false;
-  const iso = isoOf(d);
-  if (period === "오늘") return iso === todayISO;
-
-  const [y, m, day] = todayISO.split("-").map(Number);
-  const today = new Date(y, m - 1, day);
-  if (period === "이번 주") {
-    const start = new Date(today);
-    start.setDate(today.getDate() - today.getDay());
-    return iso >= isoOf(start);
-  }
-  // 이번 달
-  return iso.slice(0, 7) === todayISO.slice(0, 7);
-}
-
-/** 상태 칩 필터와 시트 상태값을 맞춘다 */
-export function matchStatusFilter(status: string, filter: StatusFilter): boolean {
-  if (filter === "전체") return true;
-  if (filter === "취소") return status === "취소";
-  if (filter === "확정") return isConfirmed(status);
-  return isPending(status) || !status;
-}
-
-/**
- * 목록 탭의 필터 + 검색 + 정렬. 전역 검색창의 "N건"과 목록이 항상 같은 결과를 쓰도록
- * AdminShell(건수)과 ListTab(목록)이 이 함수 하나를 공유한다.
- */
-export function filterBookings(rows: Row[], filters: ListFilters, todayISO: string): Row[] {
-  const q = filters.searchInput.trim();
-  return rows
-    .filter((row) => {
-      if (filters.typeFilter !== "전체" && row[1] !== filters.typeFilter) return false;
-      if (!matchStatusFilter(bookingStatus(row), filters.statusFilter)) return false;
-      if (!inPeriod(row[0], filters.period, todayISO)) return false;
-      if (!q) return true;
-      return [row[2], row[3], row[4], row[6]].some((c) => (c ?? "").includes(q));
-    })
-    .sort(byCreatedDesc);
-}
+/* ── 목록 필터 (서버와 공유) ─────────────────────────
+   화면의 "N건"과 `/api/admin/bulk`의 대상이 항상 같아야 해서 계산은 `@/lib/list-filter`
+   한 곳에 있다. 화면 쪽 import 경로를 유지하려고 여기서 그대로 re-export한다.
+   (list-filter는 브라우저 안전 — node 전용 모듈을 끌어오지 않는다.) */
+export {
+  bookingStatus,
+  byCreatedDesc,
+  inPeriod,
+  matchStatusFilter,
+  filterBookings,
+} from "@/lib/list-filter";
+export type {
+  Period,
+  TypeFilter,
+  StatusFilter,
+  ListRange,
+  ListFilters,
+} from "@/lib/list-filter";
 
 /* ── 버튼 클래스 (높이 2종만: 44px / 36px · 라벨은 항상 한 줄) ── */
 export const BTN_BASE =
