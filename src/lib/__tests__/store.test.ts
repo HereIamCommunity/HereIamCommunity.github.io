@@ -64,6 +64,22 @@ describe("전체 읽기", () => {
   });
 });
 
+describe("가짜 DB 스키마 (0001_init.sql과 동일해야 store.ts 버그를 잡는다)", () => {
+  it("테이블에 없는 컬럼을 select하면 PostgREST처럼 42703 오류를 돌려준다", async () => {
+    // retreats/open_stays에는 kind 컬럼이 없다 — bookings 전용 컬럼을 잘못 select하면 잡혀야 한다.
+    const { data, error } = await db.from("retreats").select("id,kind");
+    expect(data).toBeNull();
+    expect(error).toMatchObject({ code: "42703" });
+  });
+
+  it("없는 컬럼에 insert/update해도 마찬가지로 오류", async () => {
+    const insertErr = (await db.from("open_stays").insert({ kind: "salon" })).error;
+    const updateErr = (await db.from("retreats").update({ kind: "salon" }).eq("id", 1)).error;
+    expect(insertErr).toMatchObject({ code: "42703" });
+    expect(updateErr).toMatchObject({ code: "42703" });
+  });
+});
+
 describe("신청 저장", () => {
   it("새 행의 ref를 돌려주고, 신청일시는 실제 시각으로 저장한다", async () => {
     const ref = await appendBooking({
@@ -74,7 +90,7 @@ describe("신청 저장", () => {
     expect(db.tables.bookings[0].created_at).toBe(CREATED_ISO);
   });
 
-  it("리트릿·무료개방도 ref를 돌려준다", async () => {
+  it("리트릿·무료개방도 ref를 돌려준다 (두 테이블엔 kind 컬럼이 없다 — id만 select)", async () => {
     const r = await appendRetreat({
       createdAt: CREATED_TEXT, name: "a", phone: "b", grade: "c", region: "", session: "s1",
       referral: "", question: "", memo: "", allergy: "", care: "", parentNote: "", status: "신청",
@@ -85,6 +101,8 @@ describe("신청 저장", () => {
     });
     expect(r?.tab).toBe("리트릿");
     expect(o?.tab).toBe("무료개방");
+    expect(db.tables.retreats[0].name).toBe("a");
+    expect(db.tables.open_stays[0].name).toBe("a");
   });
 
   it("환경변수가 없으면 저장을 건너뛰고 null", async () => {

@@ -70,10 +70,16 @@ async function updateById(table: Table, id: number, values: Record<string, strin
   return (data ?? []).length > 0;
 }
 
-async function insertOne(table: Table, values: object): Promise<{ id: number; kind?: BookingKind }> {
-  const { data, error } = await getDb()!.from(table).insert(values).select("id,kind").single();
+/** columns는 삽입 후 되받을 컬럼 목록 — bookings만 kind가 있다("id,kind"), 나머지는 "id". */
+async function insertOne(
+  table: Table,
+  values: object,
+  columns: string
+): Promise<{ id: number; kind?: BookingKind }> {
+  const { data, error } = await getDb()!.from(table).insert(values).select(columns).single();
   if (error) throw error;
-  return data as { id: number; kind?: BookingKind };
+  // columns가 리터럴이 아닌 변수라 supabase-js가 결과 타입을 좁히지 못한다 — 값은 실제로 맞다.
+  return data as unknown as { id: number; kind?: BookingKind };
 }
 
 /* ─── 쓰기 ─────────────────────────────────────── */
@@ -84,7 +90,7 @@ export async function appendBooking(row: BookingRow): Promise<RowRef | null> {
     console.warn("[DB] 환경변수 미설정 — 예약 저장 건너뜀");
     return null;
   }
-  const saved = await insertOne("bookings", bookingInsert(row));
+  const saved = await insertOne("bookings", bookingInsert(row), "id,kind");
   return { tab: KIND_TAB[saved.kind ?? "stay"], id: saved.id };
 }
 
@@ -93,7 +99,7 @@ export async function appendRetreat(row: RetreatRow): Promise<RowRef | null> {
     console.warn("[DB] 환경변수 미설정 — 리트릿 저장 건너뜀");
     return null;
   }
-  const saved = await insertOne("retreats", retreatInsert(row));
+  const saved = await insertOne("retreats", retreatInsert(row), "id");
   return { tab: "리트릿", id: saved.id };
 }
 
@@ -102,7 +108,7 @@ export async function appendOpenStay(row: OpenStayRow): Promise<RowRef | null> {
     console.warn("[DB] 환경변수 미설정 — 무료개방 저장 건너뜀");
     return null;
   }
-  const saved = await insertOne("open_stays", openStayInsert(row));
+  const saved = await insertOne("open_stays", openStayInsert(row), "id");
   return { tab: "무료개방", id: saved.id };
 }
 
