@@ -1,60 +1,95 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { FakeDb } from "./fake-db";
+
+const state = vi.hoisted(() => ({ db: null as unknown }));
+vi.mock("@/lib/supabase", () => ({ getDb: () => state.db }));
+
 import {
-  BULK_LOG_HEADER,
-  encodeSnapshot,
+  appendBulkLog,
   decodeSnapshot,
-  toLogRow,
-  parseLogRow,
+  findBulkLog,
+  fromLogRecord,
   kstTimestamp,
+  markBulkLogReverted,
+  readBulkLog,
+  toLogRecord,
+  type BulkLogInput,
 } from "@/lib/bulk-log";
 import type { BulkSnapshotItem } from "@/lib/bulk";
 
 const SNAP: BulkSnapshotItem[] = [
-  { ref: { tab: "살롱", rowNum: 2 }, status: "신청", notify: "" },
-  { ref: { tab: "스테이", rowNum: 12 }, status: "", notify: "✅ 10:00 접수" },
+  { ref: { tab: "살롱", id: 2 }, status: "신청", notify: "" },
+  { ref: { tab: "스테이", id: 12 }, status: "", notify: "✅ 10:00 접수" },
 ];
 
-describe("스냅샷 직렬화", () => {
-  it("왕복하면 원래 값 (99건 로그도 한 셀에 들어가게 배열로 압축)", () => {
-    expect(decodeSnapshot(encodeSnapshot(SNAP))).toEqual(SNAP);
+const entry: BulkLogInput = {
+  jobId: "abc123abc123",
+  at: "2026-09-10 14:32:05",
+  filter: { usageBefore: "2026-09-10", status: "pending", type: "all" },
+  action: "confirm",
+  notify: false,
+  count: 2,
+  snapshot: SNAP,
+  reverted: "",
+};
+
+let db: FakeDb;
+beforeEach(() => {
+  db = new FakeDb();
+  state.db = db;
+});
+
+describe("레코드 변환", () => {
+  it("toLogRecord → fromLogRecord 왕복", () => {
+    expect(fromLogRecord({ id: 5, ...toLogRecord(entry) })).toEqual({ ...entry, id: 5 });
   });
 
-  it("깨진 값은 빈 배열 — 로그 한 줄 때문에 목록 전체가 죽지 않게", () => {
-    expect(decodeSnapshot("")).toEqual([]);
-    expect(decodeSnapshot("{oops")).toEqual([]);
-    expect(decodeSnapshot('[["살롱#0","신청",""]]')).toEqual([]); // 헤더 행 참조는 버린다
+  it("스냅샷이 깨졌으면 빈 배열 — 로그 한 줄 때문에 목록 전체가 죽지 않게", () => {
+    expect(decodeSnapshot(null)).toEqual([]);
+    expect(decodeSnapshot("oops")).toEqual([]);
+    expect(decodeSnapshot([{ ref: { tab: "살롱", id: 0 }, status: "", notify: "" }])).toEqual([]); // 헤더 자리
+    expect(decodeSnapshot([{ ref: { tab: "살롱", rowNum: 2 }, status: "", notify: "" }])).toEqual([]); // 시트 시절 모양
+  });
+
+  it("조건을 못 읽어도 되돌리기는 스냅샷만 있으면 된다", () => {
+    const e = fromLogRecord({ id: 1, ...toLogRecord(entry), filter: null });
+    expect(e.filter).toEqual({ status: "all", type: "all" });
+    expect(e.snapshot).toEqual(SNAP);
   });
 });
 
-describe("로그 행 왕복", () => {
-  const entry = {
-    jobId: "abc123abc123",
-    at: "2026-09-10 14:32:05",
-    filter: { usageBefore: "2026-09-10", status: "pending", type: "all" } as const,
-    action: "confirm" as const,
-    notify: false,
-    count: 2,
-    snapshot: SNAP,
-    reverted: "",
-  };
-
-  it("열 개수가 헤더와 같다", () => {
-    expect(toLogRow(entry)).toHaveLength(BULK_LOG_HEADER.length);
+describe("DB 입출력", () => {
+  it("기록 → jobId로 찾기 → 되돌림 표시", async () => {
+    expect(await appendBulkLog(entry)).toBe(true);
+    const found = await findBulkLog("abc123abc123");
+    expect(found?.snapshot).toEqual(SNAP);
+    expect(await markBulkLogReverted(found!.id, "2026-09-10 15:00:00")).toBe(1);
+    expect((await findBulkLog("abc123abc123"))?.reverted).toBe("2026-09-10 15:00:00");
   });
 
-  it("toLogRow → parseLogRow 왕복", () => {
-    const parsed = parseLogRow(toLogRow(entry), 5);
-    expect(parsed).toEqual({ ...entry, rowNum: 5 });
+  it("같은 jobId가 여럿이면 가장 최근 것 (되돌린 뒤 같은 대상을 다시 실행한 경우)", async () => {
+    await appendBulkLog({ ...entry, reverted: "2026-09-10 15:00:00" });
+    await appendBulkLog({ ...entry, at: "2026-09-10 16:00:00" });
+    const found = await findBulkLog("abc123abc123");
+    expect(found?.at).toBe("2026-09-10 16:00:00");
+    expect(found?.reverted).toBe("");
   });
 
-  it("jobId가 없는 행(헤더·빈 줄)은 null", () => {
-    expect(parseLogRow(BULK_LOG_HEADER, 1)).toBeNull();
-    expect(parseLogRow([], 3)).toBeNull();
+  it("최근 기록은 최신순, limit만큼", async () => {
+    for (let i = 0; i < 3; i++) await appendBulkLog({ ...entry, jobId: `job${i}` });
+    expect((await readBulkLog(2)).map((e) => e.jobId)).toEqual(["job2", "job1"]);
   });
 
-  it("되돌림 시각이 있으면 reverted에 담긴다", () => {
-    const row = toLogRow({ ...entry, reverted: "2026-09-10 15:00:00" });
-    expect(parseLogRow(row, 7)?.reverted).toBe("2026-09-10 15:00:00");
+  it("없으면 null, 환경변수가 없으면 기록하지 않고 false", async () => {
+    expect(await findBulkLog("nope")).toBeNull();
+    state.db = null;
+    expect(await appendBulkLog(entry)).toBe(false);
+  });
+
+  it("읽기 오류는 던진다 — '기록 없음'으로 보이면 운영자가 재실행할 수 있다", async () => {
+    db.failWith = { message: "boom" };
+    await expect(findBulkLog("abc")).rejects.toEqual({ message: "boom" });
+    await expect(readBulkLog()).rejects.toEqual({ message: "boom" });
   });
 });
 
