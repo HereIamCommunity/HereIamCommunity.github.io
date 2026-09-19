@@ -43,7 +43,7 @@ function stay(name: string, checkIn: string, status: string, notify = ""): strin
   return r;
 }
 
-// 살롱 탭 2~4행, 스테이 탭 2~4행 (헤더는 각 탭 1행)
+// 살롱 id 2~4, 스테이 id 2~4 (헤더 자리는 id 0). 테스트에선 탭이 달라 id가 겹쳐도 된다.
 const ROWS: string[][] = [
   HEADER,
   salon("김살롱", "9월 5일 (토) 20:00", ""),          // 연도 없는 라벨 → 2026-09-05, 입금대기
@@ -54,13 +54,13 @@ const ROWS: string[][] = [
   stay("결제스테이", "2026-09-08", "결제완료"),
 ];
 const META: RowMeta[] = [
-  { tab: "살롱", rowNum: 1 },
-  { tab: "살롱", rowNum: 2 },
-  { tab: "살롱", rowNum: 3 },
-  { tab: "살롱", rowNum: 4 },
-  { tab: "스테이", rowNum: 2 },
-  { tab: "스테이", rowNum: 3 },
-  { tab: "스테이", rowNum: 4 },
+  { tab: "살롱", id: 0 },
+  { tab: "살롱", id: 2 },
+  { tab: "살롱", id: 3 },
+  { tab: "살롱", id: 4 },
+  { tab: "스테이", id: 2 },
+  { tab: "스테이", id: 3 },
+  { tab: "스테이", id: 4 },
 ];
 
 const ALL: BulkFilter = { status: "all", type: "all" };
@@ -115,7 +115,7 @@ describe("selectBulkTargets", () => {
   it("대상에 ref·사용일·상태 원값이 담긴다", () => {
     const t = selectBulkTargets(ROWS, META, { ...ALL, type: "stay", status: "confirmed" }, NOW);
     expect(t[0]).toMatchObject({
-      ref: { tab: "스테이", rowNum: 2 },
+      ref: { tab: "스테이", id: 2 },
       name: "이스테이",
       type: "stay",
       usage: "2026-09-01",
@@ -126,8 +126,8 @@ describe("selectBulkTargets", () => {
 });
 
 describe("bulkJobId", () => {
-  const a = { tab: "살롱", rowNum: 2 } as const;
-  const b = { tab: "스테이", rowNum: 7 } as const;
+  const a = { tab: "살롱", id: 2 } as const;
+  const b = { tab: "스테이", id: 7 } as const;
 
   it("같은 집합이면 같은 값 (결정적)", () => {
     expect(bulkJobId([a, b])).toBe(bulkJobId([a, b]));
@@ -154,8 +154,8 @@ describe("planBulkWrites", () => {
   it("허용되지 않는 전이는 skip으로 빠지고 사유가 담긴다", () => {
     const p = planBulkWrites(targets, "confirm", false, AT);
     expect(p.applied).toEqual([
-      { tab: "살롱", rowNum: 2 },
-      { tab: "살롱", rowNum: 3 },
+      { tab: "살롱", id: 2 },
+      { tab: "살롱", id: 3 },
     ]);
     const skippedNames = p.skipped.map((s) => s.name);
     expect(skippedNames).toEqual(["이스테이", "최스테이", "결제스테이"]);
@@ -164,51 +164,47 @@ describe("planBulkWrites", () => {
     expect(p.skipped[2].reason).toContain("입금확인으로 바꿀 수 없습니다");
   });
 
-  it("notify:false면 N열 + O열(🔕 문구)을 같이 쓴다", () => {
+  it("notify:false면 상태 + 알림(🔕 문구)을 한 패치로", () => {
     const p = planBulkWrites(targets.slice(0, 1), "confirm", false, AT);
-    expect(p.writes).toEqual([
-      { range: "살롱!N2", values: [["입금확인"]] },
-      { range: "살롱!O2", values: [["🔕 14:32 확정 알림 없음"]] },
+    expect(p.patches).toEqual([
+      { ref: { tab: "살롱", id: 2 }, status: "입금확인", notify: "🔕 14:32 확정 알림 없음" },
     ]);
   });
 
-  it("notify:true면 N열만 쓴다 (O열은 notifyBooking이 남긴다)", () => {
+  it("notify:true면 상태만 쓴다 (알림 칸은 notifyBooking이 남긴다)", () => {
     const p = planBulkWrites(targets.slice(0, 1), "confirm", true, AT);
-    expect(p.writes).toEqual([{ range: "살롱!N2", values: [["입금확인"]] }]);
+    expect(p.patches).toEqual([{ ref: { tab: "살롱", id: 2 }, status: "입금확인" }]);
   });
 
-  it("reopen은 알림 이벤트가 없어 notify:false여도 O열을 건드리지 않는다", () => {
+  it("reopen은 알림 이벤트가 없어 notify:false여도 알림 칸을 건드리지 않는다", () => {
     const t = selectBulkTargets(ROWS, META, { ...ALL, status: "confirmed" }, NOW);
     const p = planBulkWrites(t, "reopen", false, AT);
-    expect(p.writes).toEqual([
-      { range: "스테이!N2", values: [["신청"]] },
-      { range: "스테이!N4", values: [["신청"]] },
+    expect(p.patches).toEqual([
+      { ref: { tab: "스테이", id: 2 }, status: "신청" },
+      { ref: { tab: "스테이", id: 4 }, status: "신청" },
     ]);
   });
 
   it("취소는 🔕 취소 알림 없음", () => {
     const p = planBulkWrites(targets.slice(0, 1), "cancel", false, AT);
-    expect(p.writes[1]).toEqual({ range: "살롱!O2", values: [["🔕 14:32 취소 알림 없음"]] });
+    expect(p.patches[0].notify).toBe("🔕 14:32 취소 알림 없음");
   });
 
   it("스냅샷은 쓰기 전 N·O 원값 (적용된 행만)", () => {
     const t = selectBulkTargets(ROWS, META, { ...ALL, status: "confirmed" }, NOW);
     const p = planBulkWrites(t, "reopen", false, AT);
     expect(p.snapshot).toEqual([
-      { ref: { tab: "스테이", rowNum: 2 }, status: "입금확인", notify: "✅ 10:00 확정" },
-      { ref: { tab: "스테이", rowNum: 4 }, status: "결제완료", notify: "" },
+      { ref: { tab: "스테이", id: 2 }, status: "입금확인", notify: "✅ 10:00 확정" },
+      { ref: { tab: "스테이", id: 4 }, status: "결제완료", notify: "" },
     ]);
   });
 });
 
 describe("planRevertWrites", () => {
-  it("스냅샷 한 건당 N·O 두 셀을 원값으로", () => {
+  it("스냅샷 한 건당 상태·알림을 원값으로 되돌리는 패치 하나", () => {
     expect(
-      planRevertWrites([{ ref: { tab: "스테이", rowNum: 9 }, status: "", notify: "" }])
-    ).toEqual([
-      { range: "스테이!N9", values: [[""]] },
-      { range: "스테이!O9", values: [[""]] },
-    ]);
+      planRevertWrites([{ ref: { tab: "스테이", id: 9 }, status: "", notify: "" }])
+    ).toEqual([{ ref: { tab: "스테이", id: 9 }, status: "", notify: "" }]);
   });
 });
 
@@ -291,10 +287,10 @@ describe("selectBulkTargetsFromList", () => {
   const listRefs = (f: ListFilters) =>
     filterBookings(ROWS.slice(1), f, TODAY).map((row) => {
       const i = ROWS.indexOf(row);
-      return `${META[i].tab}#${META[i].rowNum}`;
+      return `${META[i].tab}#${META[i].id}`;
     });
   const serverRefs = (f: ListFilters) =>
-    selectBulkTargetsFromList(ROWS, META, f, TODAY, NOW).map((t) => `${t.ref.tab}#${t.ref.rowNum}`);
+    selectBulkTargetsFromList(ROWS, META, f, TODAY, NOW).map((t) => `${t.ref.tab}#${t.ref.id}`);
 
   it("목록과 정확히 같은 행을 같은 순서로 고른다 (기간설정)", () => {
     const f: ListFilters = {

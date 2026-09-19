@@ -23,7 +23,7 @@ import {
 
 const PW_KEY = "koinonia-admin-pw";
 
-/** 6.1 계약 — meta·retreatMeta·openMeta는 rows와 같은 순서의 시트 행 번호 */
+/** 6.1 계약 — meta·retreatMeta·openMeta는 rows와 같은 순서의 행 참조({tab, id}) */
 type BookingsResponse = {
   rows?: Row[];
   retreats?: Row[];
@@ -159,7 +159,7 @@ export default function AdminPage() {
   }, []);
 
   /**
-   * 받은 행에 시트 행 번호(6.1의 meta)를 먼저 붙이고 state에 넣는다.
+   * 받은 행에 행 참조(6.1의 meta)를 먼저 붙이고 state에 넣는다.
    * 상태 변경·재발송은 이 ref로 행을 찍어 보내므로, 연락처·신청일시가 빈 행도 처리된다.
    */
   const applyResult = useCallback((r: LoadResult) => {
@@ -254,7 +254,7 @@ export default function AdminPage() {
       setBusyKey(key);
       const res = await apiFetch("/api/admin/status", {
         method: "POST",
-        // ref가 있으면 서버가 시트 행 번호로 직접 찾는다 (6.1). 없으면 서버가 예전 방식으로 떨어진다.
+        // ref가 있으면 서버가 DB id로 직접 찾는다 (6.1). 없으면 서버가 예전 방식으로 떨어진다.
         body: JSON.stringify({ sheet, row, action, reason, ref: rowRef(row) }),
       });
       const d = (res.data ?? {}) as { ok?: boolean; status?: string; error?: string; notify?: unknown };

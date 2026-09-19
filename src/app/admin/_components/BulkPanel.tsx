@@ -49,7 +49,7 @@ export type BulkFilter = {
   type: BulkTypeFilter;
 };
 
-/** 응답의 행 참조. `{tab,rowNum}`이 계약이지만 문자열로 와도 화면이 깨지지 않게 둘 다 받는다. */
+/** 응답의 행 참조. `{tab,id}`가 계약이지만 문자열로 와도 화면이 깨지지 않게 둘 다 받는다. */
 export type BulkRowRef = RowRef | string;
 
 export type BulkPreviewRow = { ref?: BulkRowRef; name: string; type: string; usage: string; status: string };
@@ -143,9 +143,9 @@ function usageText(raw: string): string {
 function refLabel(ref: BulkRowRef | undefined): string {
   if (!ref) return "행 정보 없음";
   if (typeof ref === "string") return ref;
-  return `${ref.tab} ${ref.rowNum}행`;
+  return `${ref.tab} #${ref.id}`;
 }
-/** 실패·건너뜀 한 줄의 머리 — 이름이 있으면 이름, 없으면 시트 행 번호 */
+/** 실패·건너뜀 한 줄의 머리 — 이름이 있으면 이름, 없으면 행 번호(#id) */
 function whoLabel(item: { ref?: BulkRowRef; name?: string }): string {
   return item.name?.trim() ? `${item.name} (${refLabel(item.ref)})` : refLabel(item.ref);
 }

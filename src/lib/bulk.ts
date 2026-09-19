@@ -1,12 +1,12 @@
 /**
  * 일괄 처리(bulk)의 순수 로직 — 대상 선정 · 잡 식별자 · 쓰기 계획 · 요청 파싱.
  *
- * 시트 I/O·네트워크 없음. 라우트(`/api/admin/bulk`)는 이 결과를 그대로 실행한다.
+ * DB I/O·네트워크 없음. 라우트(`/api/admin/bulk`)는 이 결과를 그대로 실행한다.
  *
  * 왜 순수하게 떼어놨나: 2026-09-10 운영에서 99건을 건별 API로 돌렸다가
  * 행마다 시트를 다시 읽어 **읽기 쿼터(429)** 에 걸렸다. 그래서 run은
- * `getAllBookingsWithMeta()` **읽기 1회** → `planBulkWrites` → `batchUpdateCells` **쓰기 1회**로 끝낸다.
- * 대상 선정과 쓰기 계획이 시트를 만지지 않아야 이 구조가 유지된다.
+ * `getAllBookingsWithMeta()` **읽기 1회** → `planBulkWrites` → `applyPatches` **쓰기 1회**로 끝낸다.
+ * `applyPatches`는 DB 함수 한 번 호출이라 전부 반영되거나 하나도 반영되지 않는다(2026-09-19 Supabase 이전).
  *
  * 예약 행(A~O): 0신청일시 1구분 2이름 3연락처 4프로그램 5일시 6객실 7박수
  *               8체크인 9체크아웃 10할인 11결제금액 12요청사항 13상태 14알림
@@ -30,7 +30,7 @@ import {
 } from "@/lib/list-filter";
 import { silentStatusText } from "@/lib/messaging";
 import { usageDateISO } from "@/lib/past-booking";
-import { refCellRange, type RowMeta, type RowRef } from "@/lib/row-ref";
+import type { BookingPatch, RowMeta, RowRef } from "@/lib/row-ref";
 
 export type BulkStatusFilter = "pending" | "confirmed" | "cancelled" | "all";
 export type BulkTypeFilter = "all" | "salon" | "stay";
@@ -52,19 +52,19 @@ export type BulkTarget = {
   type: "salon" | "stay";
   /** 사용일 ISO(YYYY-MM-DD). 스테이=체크인, 살롱=일시. 판정 불가 행은 대상이 되지 않는다. */
   usage: string;
-  /** N열 원값 */
+  /** 상태 원값 */
   status: string;
-  /** O열 원값 */
+  /** 알림 원값 */
   notify: string;
   row: string[];
 };
 
-/** 되돌리기용 스냅샷 한 건 — 쓰기 직전의 N·O 원값. */
+/** 되돌리기용 스냅샷 한 건 — 쓰기 직전의 상태·알림 원값. */
 export type BulkSnapshotItem = { ref: RowRef; status: string; notify: string };
 
 export type BulkPlan = {
-  /** values.batchUpdate에 그대로 넘길 data */
-  writes: { range: string; values: string[][] }[];
+  /** `applyPatches`에 그대로 넘길 변경 목록 — 대상 한 건당 하나 */
+  patches: BookingPatch[];
   snapshot: BulkSnapshotItem[];
   applied: RowRef[];
   skipped: { ref: RowRef; name: string; reason: string }[];
@@ -88,7 +88,7 @@ function matchesStatus(status: string, want: BulkStatusFilter): boolean {
  * `meta`는 그와 **길이·순서가 같은** 행 참조 배열.
  *
  * 제외 규칙:
- * - 헤더 행(meta.rowNum < 2)
+ * - 헤더 자리(meta.id < 1)
  * - 살롱·스테이가 아닌 탭
  * - **사용일을 읽을 수 없는 행** — 날짜로 범위를 자르는 기능이라, 날짜를 모르는 행을
  *   쓸어 담는 사고를 막는다(조건에 날짜가 없어도 마찬가지).
@@ -105,7 +105,7 @@ export function selectBulkTargets(
     const row = rows[i];
     const ref = meta[i];
     if (!row || !ref) continue;
-    if (ref.rowNum < 2) continue;                                  // 헤더
+    if (ref.id < 1) continue;                                      // 헤더 자리
     if (ref.tab !== "살롱" && ref.tab !== "스테이") continue;
 
     const booking = parseAdminRow(row);
@@ -161,7 +161,7 @@ export function selectBulkTargetsFromList(
   for (const row of filterBookings(rows.slice(1), filters, todayISO)) {
     const ref = refByRow.get(row);
     if (!ref) continue;
-    if (ref.rowNum < 2) continue;                                  // 헤더
+    if (ref.id < 1) continue;                                      // 헤더 자리
     if (ref.tab !== "살롱" && ref.tab !== "스테이") continue;
 
     const booking = parseAdminRow(row);
@@ -188,7 +188,7 @@ export function selectBulkTargetsFromList(
  */
 export function bulkJobId(refs: RowRef[]): string {
   const key = refs
-    .map((r) => `${r.tab}#${r.rowNum}`)
+    .map((r) => `${r.tab}#${r.id}`)
     .sort()
     .join("\n");
   return createHash("sha256").update(key).digest("hex").slice(0, 12);
@@ -198,11 +198,11 @@ export function bulkJobId(refs: RowRef[]): string {
 
 /**
  * 대상마다 `resolveStatusAction`으로 허용 여부를 판정해 적용/스킵을 나누고,
- * batchUpdate 한 번에 넘길 셀 목록을 만든다.
+ * `applyPatches` 한 번에 넘길 변경 목록을 만든다.
  *
- * - notify:false + 알림이 있는 액션(confirm·cancel) → O열에 `🔕 HH:MM … 알림 없음`
- * - notify:true → N열만. O열은 발송 후 `notifyBooking`이 남긴다.
- * - 스냅샷은 **적용된 행만**, 쓰기 전 N·O 원값 그대로(되돌리기의 원천).
+ * - notify:false + 알림이 있는 액션(confirm·cancel) → 알림 칸에 `🔕 HH:MM … 알림 없음`
+ * - notify:true → 상태만. 알림 칸은 발송 후 `notifyBooking` 결과로 남긴다.
+ * - 스냅샷은 **적용된 행만**, 쓰기 전 상태·알림 원값 그대로(되돌리기의 원천).
  */
 export function planBulkWrites(
   targets: BulkTarget[],
@@ -210,7 +210,7 @@ export function planBulkWrites(
   notify: boolean,
   now: Date = new Date()
 ): BulkPlan {
-  const plan: BulkPlan = { writes: [], snapshot: [], applied: [], skipped: [] };
+  const plan: BulkPlan = { patches: [], snapshot: [], applied: [], skipped: [] };
 
   for (const t of targets) {
     const resolved = resolveStatusAction("booking", t.status, action);
@@ -219,13 +219,9 @@ export function planBulkWrites(
       continue;
     }
 
-    plan.writes.push({ range: refCellRange(t.ref, "N"), values: [[resolved.status]] });
-    if (!notify && resolved.event) {
-      plan.writes.push({
-        range: refCellRange(t.ref, "O"),
-        values: [[silentStatusText(resolved.event, now)]],
-      });
-    }
+    const patch: BookingPatch = { ref: t.ref, status: resolved.status };
+    if (!notify && resolved.event) patch.notify = silentStatusText(resolved.event, now);
+    plan.patches.push(patch);
 
     plan.snapshot.push({ ref: t.ref, status: t.status, notify: t.notify });
     plan.applied.push(t.ref);
@@ -234,14 +230,9 @@ export function planBulkWrites(
   return plan;
 }
 
-/** 스냅샷을 그대로 되돌리는 batchUpdate data — 행마다 N·O 두 셀. */
-export function planRevertWrites(
-  snapshot: BulkSnapshotItem[]
-): { range: string; values: string[][] }[] {
-  return snapshot.flatMap((s) => [
-    { range: refCellRange(s.ref, "N"), values: [[s.status]] },
-    { range: refCellRange(s.ref, "O"), values: [[s.notify]] },
-  ]);
+/** 스냅샷을 그대로 되돌리는 변경 목록 — 한 건당 상태·알림 두 칸. */
+export function planRevertWrites(snapshot: BulkSnapshotItem[]): BookingPatch[] {
+  return snapshot.map((s) => ({ ref: s.ref, status: s.status, notify: s.notify }));
 }
 
 /* ─── 요청 파싱 ────────────────────────────────── */
@@ -408,12 +399,12 @@ export function parseBulkRequest(body: unknown): BulkRequestParse {
 /* ─── 실행 안전장치 ────────────────────────────── */
 
 export const BULK_LOG_REQUIRED_ERROR =
-  "실행 기록을 남기지 못해 중단했습니다. 시트 접근 권한/쿼터를 확인하세요.";
+  "실행 기록을 남기지 못해 중단했습니다. DB 연결 상태를 확인하세요.";
 
 /**
- * batchUpdate를 진행해도 되는지 (순수 판정).
+ * 상태를 바꿔도 되는지 (순수 판정).
  *
- * 되돌리기의 **유일한** 근거가 `_bulk_log`의 스냅샷이다. 로그가 안 남았는데 상태를 바꾸면
+ * 되돌리기의 **유일한** 근거가 `bulk_logs`의 스냅샷이다. 로그가 안 남았는데 상태를 바꾸면
  * 최대 500행이 되돌릴 수 없는 상태가 된다 — 그래서 쓰기 **전에** 막는다.
  * 적용할 행이 0건이면 바꿀 것도 없으므로 로그 없이 통과.
  */

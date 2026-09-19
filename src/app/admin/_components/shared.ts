@@ -28,7 +28,7 @@ export const ROOM_NAMES: Record<string, string> = {
 export const ROOM_KEYS = ["nagnae", "oksun", "yeutae"] as const;
 export type RoomKey = (typeof ROOM_KEYS)[number];
 
-/* ── 시트 행 번호 레지스트리 (6.1 계약) ──────────────────────
+/* ── 행 참조 레지스트리 (6.1 계약, 2026-09-19부터 DB id) ─────────
    행은 화면 전체에서 `string[]` 그대로 흘러다니고 digest·필터·정렬이 같은 배열 참조를
    유지한다. ref를 프롭으로 나르면 컴포넌트 8곳의 시그니처가 전부 바뀌므로,
    행 배열의 정체성에 WeakMap으로 붙여 둔다. 등록은 데이터를 받은 쪽(page/preview)이 한 번만 한다. */
@@ -44,23 +44,23 @@ export function registerRowRefs(rawRows: Row[], meta: RowRef[] | undefined): voi
   const offset = meta.length === rawRows.length ? 1 : 0;
   for (let i = 1; i < rawRows.length; i++) {
     const m = meta[i - 1 + offset];
-    if (m && typeof m.rowNum === "number") REF_BY_ROW.set(rawRows[i], { tab: m.tab, rowNum: m.rowNum });
+    if (m && typeof m.id === "number" && m.id > 0) REF_BY_ROW.set(rawRows[i], { tab: m.tab, id: m.id });
   }
 }
 
-/** 등록된 시트 행 번호. 없으면 undefined (API가 meta를 아직 안 주는 경우) */
+/** 등록된 행 참조. 없으면 undefined (API가 meta를 아직 안 주는 경우) */
 export function rowRef(row: Row): RowRef | undefined {
   return REF_BY_ROW.get(row);
 }
 
 /**
  * 행 식별 키.
- * ref가 있으면 시트 행 번호로 만든다 — 연락처·신청일시가 둘 다 빈 행이 여럿이면
+ * ref가 있으면 DB id로 만든다 — 연락처·신청일시가 둘 다 빈 행이 여럿이면
  * 예전 키(신청일시|연락처)가 충돌해 엉뚱한 행이 같이 강조되던 문제가 있었다.
  */
 export function rowKey(sheet: SheetKind, row: Row): string {
   const ref = REF_BY_ROW.get(row);
-  if (ref) return `${sheet}:${ref.tab}#${ref.rowNum}`;
+  if (ref) return `${sheet}:${ref.tab}#${ref.id}`;
   const phone = sheet === "booking" ? row[3] : row[2];
   return `${sheet}:${row[0] ?? ""}|${phone ?? ""}`;
 }

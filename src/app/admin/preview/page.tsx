@@ -126,9 +126,9 @@ const SAMPLE_ENV = {
   slack: { configured: true, channel: "C0123SAMPLE" },
 };
 
-/** 실제 API의 meta(6.1)를 흉내 낸다 — rows와 길이·순서가 같고 meta[0]은 헤더 행 */
+/** 실제 API의 meta를 흉내 낸다 — rows와 길이·순서가 같고 meta[0]은 헤더 자리(id 0) */
 function sampleMeta(rawRows: Row[], tabOf: (row: Row) => SheetTab): RowRef[] {
-  return rawRows.map((row, i) => ({ tab: tabOf(row), rowNum: i + 1 }));
+  return rawRows.map((row, i) => ({ tab: tabOf(row), id: i }));
 }
 
 /* ── 일괄 처리 가짜 API의 대상 계산 ────────────────────────
