@@ -41,6 +41,10 @@ function importCreated(raw: string, where: string, warnings: string[], keep: (no
   return null;
 }
 
+const PLAIN_AMOUNT = /^[₩\s\d,]+원?$/;
+/** Postgres integer 최댓값. 넘으면 청크 전체 insert가 실패한다. */
+const PG_INT_MAX = 2147483647;
+
 export function importBookingRow(values: string[], kind: BookingKind, sheetRow: number): Imported<BookingImport> {
   const where = `${KIND_TAB[kind]} ${sheetRow}행`;
   const warnings: string[] = [];
@@ -51,9 +55,12 @@ export function importBookingRow(values: string[], kind: BookingKind, sheetRow: 
   const rawAmount = cell(values, 11);
   let total_amount: number | null = null;
   if (rawAmount) {
+    // 숫자·쉼표·공백·₩·끝의 '원'만 허용. "150,000원 (2박)"·"15만원"처럼 다른 글자가 섞이면
+    // 숫자만 이어 붙이면 엉뚱한 값(1500002, 15)이 되므로 읽지 않는다.
     const digits = rawAmount.replace(/\D/g, "");
-    if (digits) {
-      total_amount = Number(digits);
+    const amount = PLAIN_AMOUNT.test(rawAmount) && digits ? Number(digits) : NaN;
+    if (amount <= PG_INT_MAX) {
+      total_amount = amount;
     } else {
       warnings.push(`${where}: 금액을 숫자로 못 읽음 "${rawAmount}" → 요청사항에 보존`);
       memo = withNote(memo, `[이전 전 금액: ${rawAmount}]`);
@@ -145,6 +152,8 @@ export type SheetBulkLog = {
   notify: boolean;
   count: number;
   snapshot: SheetSnapshotItem[];
+  /** G열에 값이 있는데 읽지 못해 스냅샷이 비었다 → 이 작업은 되돌릴 수 없다 */
+  snapshotUnreadable: boolean;
   reverted: string;
 };
 
@@ -187,6 +196,9 @@ export function parseSheetBulkLogRow(values: string[], sheetRow: number): SheetB
     /* 조건을 못 읽어도 되돌리기는 스냅샷만 있으면 된다 */
   }
 
+  const rawSnapshot = cell(values, 6);
+  const snapshot = decodeSheetSnapshot(rawSnapshot);
+
   return {
     sheetRow,
     jobId,
@@ -195,7 +207,8 @@ export function parseSheetBulkLogRow(values: string[], sheetRow: number): SheetB
     action: (cell(values, 3) || "confirm") as BulkAction,
     notify: cell(values, 4) === "발송",
     count: Number(cell(values, 5)) || 0,
-    snapshot: decodeSheetSnapshot(cell(values, 6)),
+    snapshot,
+    snapshotUnreadable: rawSnapshot !== "" && snapshot.length === 0,
     reverted: cell(values, 7),
   };
 }
@@ -239,4 +252,24 @@ export function diffImported(
 ): string[] {
   const norm = (v: unknown) => (v === null || v === undefined ? "" : String(v));
   return fields.filter((f) => norm(sheetRec[f]) !== norm(dbRec[f]));
+}
+
+/**
+ * 같은 sheet_row의 DB 행이 정말 같은 신청인지(행이 밀리지 않았는지) — 신청일시·이름·연락처 숫자.
+ * 다르면 다른 칸 이름을 돌려준다. 신청일시는 시각으로 비교하고(DB는 "+00:00" 표기), null과 빈 문자열은 같다.
+ */
+export function identityMismatch(sheetRec: Record<string, unknown>, dbRec: Record<string, unknown>): string[] {
+  const text = (v: unknown) => (v === null || v === undefined ? "" : String(v).trim());
+  const time = (v: unknown) => {
+    const t = text(v);
+    if (!t) return "";
+    const ms = Date.parse(t);
+    return Number.isNaN(ms) ? t : String(ms);
+  };
+  const digits = (v: unknown) => text(v).replace(/\D/g, "");
+  const out: string[] = [];
+  if (time(sheetRec.created_at) !== time(dbRec.created_at)) out.push("created_at");
+  if (text(sheetRec.name) !== text(dbRec.name)) out.push("name");
+  if (digits(sheetRec.phone) !== digits(dbRec.phone)) out.push("phone");
+  return out;
 }

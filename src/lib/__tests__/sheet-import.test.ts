@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   bulkLogImport,
   diffImported,
+  identityMismatch,
   importBookingRow,
   importOpenStayRow,
   importRetreatRow,
@@ -36,6 +37,32 @@ describe("importBookingRow", () => {
   it("금액 '150,000'·'150000원'은 숫자만", () => {
     expect(importBookingRow(stayRow({ 11: "150,000" }), "stay", 2).record.total_amount).toBe(150000);
     expect(importBookingRow(stayRow({ 11: "150000원" }), "stay", 2).record.total_amount).toBe(150000);
+  });
+
+  it("금액 '₩150,000'·'150,000원'은 숫자만", () => {
+    expect(importBookingRow(stayRow({ 11: "₩150,000" }), "stay", 2).record.total_amount).toBe(150000);
+    expect(importBookingRow(stayRow({ 11: "150,000원" }), "stay", 2).record.total_amount).toBe(150000);
+  });
+
+  it("금액에 다른 글자가 섞이면('150,000원 (2박)') 숫자를 이어 붙이지 않고 null + 보존 + 경고", () => {
+    const { record, warnings } = importBookingRow(stayRow({ 11: "150,000원 (2박)" }), "stay", 7);
+    expect(record.total_amount).toBeNull();
+    expect(record.memo).toBe("창가\n[이전 전 금액: 150,000원 (2박)]");
+    expect(warnings).toEqual(["스테이 7행: 금액을 숫자로 못 읽음 \"150,000원 (2박)\" → 요청사항에 보존"]);
+  });
+
+  it("'15만원'은 15로 읽지 않고 null + 보존 + 경고", () => {
+    const { record, warnings } = importBookingRow(stayRow({ 11: "15만원" }), "stay", 7);
+    expect(record.total_amount).toBeNull();
+    expect(record.memo).toBe("창가\n[이전 전 금액: 15만원]");
+    expect(warnings).toHaveLength(1);
+  });
+
+  it("정수 범위(2147483647)를 넘는 금액은 null + 보존 + 경고", () => {
+    const { record, warnings } = importBookingRow(stayRow({ 11: "99999999999" }), "stay", 7);
+    expect(record.total_amount).toBeNull();
+    expect(record.memo).toBe("창가\n[이전 전 금액: 99999999999]");
+    expect(warnings).toHaveLength(1);
   });
 
   it("금액이 비면 null, 경고 없음", () => {
@@ -118,6 +145,18 @@ describe("일괄 처리 로그", () => {
     ]);
   });
 
+  it("스냅샷 칸이 있는데 못 읽으면 snapshotUnreadable", () => {
+    expect(parseSheetBulkLogRow(row, 4)!.snapshotUnreadable).toBe(false);
+    const broken = [...row];
+    broken[6] = "[[깨짐";
+    const log = parseSheetBulkLogRow(broken, 4)!;
+    expect(log.snapshot).toEqual([]);
+    expect(log.snapshotUnreadable).toBe(true);
+    const empty = [...row];
+    empty[6] = "";
+    expect(parseSheetBulkLogRow(empty, 4)!.snapshotUnreadable).toBe(false);
+  });
+
   it("헤더·빈 줄은 null", () => {
     expect(parseSheetBulkLogRow(["jobId", "시각"], 1)).toBeNull();
     expect(parseSheetBulkLogRow([], 3)).toBeNull();
@@ -151,5 +190,27 @@ describe("diffImported", () => {
 
   it("null과 빈 문자열은 같다고 본다", () => {
     expect(diffImported({ memo: "" }, { memo: null }, ["memo"])).toEqual([]);
+  });
+});
+
+describe("identityMismatch", () => {
+  const sheet = { sheet_row: 5, created_at: "2026-09-06T10:10:32.000Z", name: "홍길동", phone: "010-1234-5678" };
+
+  it("같은 행이면 빈 배열 (DB 시각 표기 '+00:00'도 같은 시각으로 본다)", () => {
+    expect(identityMismatch(sheet, { ...sheet, id: 9, created_at: "2026-09-06T10:10:32+00:00" })).toEqual([]);
+  });
+
+  it("이름이 다르면 name", () => {
+    expect(identityMismatch(sheet, { ...sheet, name: "김철수" })).toEqual(["name"]);
+  });
+
+  it("연락처는 숫자만 비교한다", () => {
+    expect(identityMismatch(sheet, { ...sheet, phone: "01012345678" })).toEqual([]);
+    expect(identityMismatch(sheet, { ...sheet, phone: "010-9999-5678" })).toEqual(["phone"]);
+  });
+
+  it("신청일시 null과 빈 문자열은 같다고 본다", () => {
+    expect(identityMismatch({ ...sheet, created_at: "" }, { ...sheet, created_at: null })).toEqual([]);
+    expect(identityMismatch({ ...sheet, created_at: null }, { ...sheet })).toEqual(["created_at"]);
   });
 });
