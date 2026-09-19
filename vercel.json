@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/stay-checkout",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/db-health",
+      "schedule": "0 21 * * *"
     }
   ]
 }

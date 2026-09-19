@@ -9,6 +9,7 @@
  *   예외: `getRetreatCounts`는 신청 페이지가 죽지 않게 0으로 채워 돌려준다.
  */
 
+import { reportDbFailure } from "@/lib/db-alert";
 import { getDb } from "@/lib/supabase";
 import { fetchAllPages, type PageResult } from "@/lib/paginate";
 import { isBookingTab, type BookingPatch, type RowMeta, type RowRef } from "@/lib/row-ref";
@@ -77,7 +78,11 @@ async function insertOne(
   columns: string
 ): Promise<{ id: number; kind?: BookingKind }> {
   const { data, error } = await getDb()!.from(table).insert(values).select(columns).single();
-  if (error) throw error;
+  if (error) {
+    // 손님 신청이 저장되지 않았다 — 운영자가 바로 알아야 한다(무료 플랜 일시정지 등).
+    await reportDbFailure(`신청 저장 (${table})`, error);
+    throw error;
+  }
   // columns가 리터럴이 아닌 변수라 supabase-js가 결과 타입을 좁히지 못한다 — 값은 실제로 맞다.
   return data as unknown as { id: number; kind?: BookingKind };
 }
@@ -293,4 +298,26 @@ export async function applyPatches(patches: BookingPatch[]): Promise<number> {
   const { data, error } = await db.rpc("apply_booking_patches", { patches: patchesPayload(patches) });
   if (error) throw error;
   return Number(data ?? 0);
+}
+
+/* ─── 점검 ─────────────────────────────────────── */
+
+export const HEALTH_TABLES = ["bookings", "retreats", "open_stays", "bulk_logs"] as const;
+
+/**
+ * 네 테이블을 한 번씩 조회한다. 매일 cron이 불러 무료 플랜의 7일 무활동 일시정지를 막고,
+ * 실패하면 cron이 경고를 보낸다. 환경변수 누락도 실패로 본다.
+ */
+export async function checkDbHealth(): Promise<
+  { ok: true; tables: string[] } | { ok: false; table: string; error: unknown }
+> {
+  const db = getDb();
+  if (!db) {
+    return { ok: false, table: "-", error: new Error("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 미설정") };
+  }
+  for (const table of HEALTH_TABLES) {
+    const { error } = await db.from(table).select("id").limit(1);
+    if (error) return { ok: false, table, error };
+  }
+  return { ok: true, tables: [...HEALTH_TABLES] };
 }

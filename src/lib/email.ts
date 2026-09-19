@@ -199,3 +199,29 @@ export async function sendRetreatConfirmation({
 
   await resend.emails.send({ from: FROM_EMAIL, to: [email], subject, html });
 }
+
+/* ─── 운영 알림 (DB 장애·주간 백업) ─────────────── */
+
+/**
+ * 운영자에게 텍스트 메일을 보낸다. 첨부파일(주간 백업 JSON)도 받는다.
+ * RESEND_API_KEY가 없으면 경고만 남긴다. 전송 오류는 던진다 — 호출부가 실패를 알아야 한다.
+ */
+export async function sendOperatorNotice(
+  subject: string,
+  text: string,
+  opts: { to?: string; attachments?: { filename: string; content: Buffer }[] } = {}
+): Promise<void> {
+  const resend = getResend();
+  if (!resend) {
+    console.warn("[EMAIL] RESEND_API_KEY 미설정 — 운영 알림 메일 건너뜀:", subject);
+    return;
+  }
+  const { error } = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: [opts.to || OPERATOR_EMAIL],
+    subject,
+    text,
+    attachments: opts.attachments,
+  });
+  if (error) throw new Error(`[EMAIL] ${error.message}`);
+}

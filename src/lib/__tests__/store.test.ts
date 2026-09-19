@@ -3,6 +3,7 @@ import { FakeDb } from "./fake-db";
 
 const state = vi.hoisted(() => ({ db: null as unknown }));
 vi.mock("@/lib/supabase", () => ({ getDb: () => state.db }));
+vi.mock("@/lib/db-alert", () => ({ reportDbFailure: vi.fn(async () => "slack") }));
 
 import {
   appendBooking,
@@ -10,11 +11,13 @@ import {
   appendOpenStay,
   appendRetreat,
   applyPatches,
+  checkDbHealth,
   getAllBookingsWithMeta,
   getAllRetreatsWithMeta,
   getBookingRow,
   getBookingsByPhone,
   getRetreatCounts,
+  HEALTH_TABLES,
   updateBookingStatus,
   updateNotifyStatus,
   updateRetreatStatus,
@@ -213,5 +216,22 @@ describe("applyPatches", () => {
     await expect(applyPatches([{ ref: { tab: "살롱", id: 9 }, status: "x" }])).rejects.toEqual({
       message: "booking id 9 not found",
     });
+  });
+});
+
+describe("checkDbHealth", () => {
+  it("네 테이블을 모두 조회하면 ok", async () => {
+    expect(await checkDbHealth()).toEqual({ ok: true, tables: [...HEALTH_TABLES] });
+  });
+
+  it("조회가 실패하면 그 테이블과 오류", async () => {
+    db.failWith = { message: "paused" };
+    expect(await checkDbHealth()).toEqual({ ok: false, table: "bookings", error: { message: "paused" } });
+  });
+
+  it("환경변수가 없으면 실패로 본다 (배포 설정 누락도 경고 대상)", async () => {
+    state.db = null;
+    const res = await checkDbHealth();
+    expect(res.ok).toBe(false);
   });
 });
