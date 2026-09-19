@@ -105,8 +105,16 @@
 - `kind`는 `살롱`/`스테이`로, `total_amount`는 숫자 문자열로(`null`이면 `""`) 바꾼다.
 - 정렬: 지금 시트는 추가된 순서다. `bookings`는 살롱 전체 뒤에 스테이 전체(기존 `mergeBookingRowsWithMeta`와 같은 순서), 각 탭 안에서는 `id` 오름차순으로 돌려준다.
 
+**전체 조회는 반드시 나눠서 끝까지 읽는다.** Supabase API는 한 번에 최대 1,000행만 돌려주고, 넘치는 행은 에러 없이 잘린다. 1,000건을 넘으면 관리자 목록·통계·일괄 처리 대상·아침 리포트에서 오래된 건이 조용히 빠진다.
+- 모든 "전체 읽기"는 공용 헬퍼 `selectAll(table, build)` 하나로만 한다. `id` 오름차순으로 `.range(from, from + 999)`를 반복하고, 받은 행이 1,000개보다 적으면 멈춘다.
+- `store.ts`에서 이 헬퍼 없이 `.select()`를 쓰는 곳은 `id` 하나로 찾는 조회뿐이다. 연락처 조회는 결과가 1,000건을 넘을 일이 없지만 일관성을 위해 헬퍼를 쓴다.
+- 테스트로 고정한다: 가짜 클라이언트가 2,500행을 1,000개씩 돌려줄 때 2,500행이 모두 나오는지 검증한다.
+- 성능: 이 규모(수천 건)에서는 전체를 읽어도 수백 ms 수준이라 문제없다. 수만 건대가 되면 B단계에서 관리자 목록을 기간·페이지 단위 조회로 바꾼다.
+
 변환 규칙 (입력 → DB 행):
 - `appendBooking`의 `createdAt`(ko-KR 문자열)은 `parseSheetDateTime`으로 `Date`를 만들어 저장한다. 호출부가 넘기는 문자열은 바꾸지 않는다.
+- **`appendBooking`, `appendRetreat`, `appendOpenStay`는 새 행의 `RowRef`(`{tab, id}`)를 돌려준다.** 환경변수가 없어 저장을 건너뛰면 `null`이다.
+- `api/booking/route.ts`와 `api/payment/confirm/route.ts`는 받은 ref를 `notifyBooking(..., { ref })`로 넘긴다. 그래서 알림 결과가 방금 만든 바로 그 행에 기록된다. 신청일시 문자열로 행을 다시 찾으면, 같은 연락처로 예약이 여러 건일 때 다른 건에 기록될 수 있는데 이 경로를 없앤다.
 - 할인 코드(`geot`/`nagnae`) → 표시 문자열 변환은 기존 로직을 그대로 옮긴다.
 
 행 찾기:
@@ -125,7 +133,11 @@
 ### 일괄 처리
 
 - `bulk.ts`의 `BulkPlan.writes`(A1 범위)를 `patches: { ref: RowRef; status?: string; notify?: string }[]`로 바꾼다. 대상 계산, 스냅샷, 스킵 사유 로직은 그대로다. `planRevertWrites`도 같은 패치 형식을 반환한다.
-- `store.applyPatches(patches)`: 패치마다 `bookings`를 `id`로 update한다. 대상은 최대 500건(`MAX_BULK_TARGETS`)이므로 동시성 제한을 둔 병렬 update로 충분하다. 반환값은 갱신된 행 수다.
+- `store.applyPatches(patches)`: **Postgres 함수 `apply_booking_patches(patches jsonb)` 한 번 호출(`rpc`)로 처리한다.** 함수 하나는 한 트랜잭션이라 전부 반영되거나 하나도 반영되지 않는다. 중간에 끊겨 일부만 바뀌는 일이 없다.
+  - 함수는 `0001_init.sql`에 함께 정의한다. 각 원소 `{ id, status?, notify? }`에 대해 주어진 필드만 update한다(`coalesce`).
+  - 없는 `id`가 하나라도 있으면 예외를 던져 전체를 롤백한다. 반환값은 갱신된 행 수다.
+  - `security invoker`로 두고 `anon`, `authenticated`에서 `execute` 권한을 회수한다(service role만 호출).
+  - 알림 발송 결과 기록(`notify:true`일 때 발송 후 O열 갱신)도 같은 함수를 쓴다.
 - `bulk-log.ts`는 `bulk_logs` 테이블을 쓴다. `appendBulkLog`는 insert, `findBulkLog(jobId)`는 select, `markBulkLogReverted(id, at)`는 update다. run은 지금처럼 **update 전에** 로그를 남긴다.
 - 스냅샷 직렬화 `"스테이#12"` 문자열 포맷은 없애고 jsonb 객체 배열로 저장한다.
 
@@ -133,7 +145,7 @@
 
 - 삭제: `src/lib/sheets.ts`, `googleapis` 의존성, `google-apps-script/`, `initSheetHeaders`, `a1Tab`, `ensureSheetTab`, `appendSheetRow`, `readSheetRange`, `batchUpdateCells`, `isMissingRangeError`
 - 단, 이전 스크립트가 시트를 읽어야 하므로 `googleapis`는 **devDependencies로 옮기고** 스크립트에서만 쓴다. 전환 완료 후 별도 커밋으로 제거한다.
-- `.env.example`: `GOOGLE_*` 항목을 "이전 스크립트 전용"으로 표시하고 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`를 추가한다.
+- `.env.example`: `GOOGLE_*` 항목을 "이전 스크립트 전용"으로 표시하고 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKUP_EMAIL`(주간 백업 수신, 선택)을 추가한다.
 - 문서 `docs/admin-ux-design.md`의 시트 행 번호 설명에 "Supabase 이전 후 `{tab, id}`로 대체됨" 한 줄을 덧붙인다.
 
 ## 3. 데이터 이전
@@ -142,9 +154,11 @@
 
 - 실행: `npx tsx scripts/migrate-sheets-to-supabase.ts [--dry-run]` (`.env.local`의 `GOOGLE_*`, `SUPABASE_*` 사용)
 - 순서: 살롱 → 스테이 → 리트릿 → 무료개방 → `_bulk_log`
-- 각 행을 변환해 `sheet_row` 기준 upsert한다(여러 번 돌려도 안전). 완전히 빈 행은 건너뛴다.
-- `--dry-run`: 쓰지 않고 탭별 읽은 행 수, 변환 경고를 출력한다.
-- 끝나면 탭별 **시트 행 수 / DB 행 수**를 표로 출력하고, 다르면 종료 코드 1로 끝낸다.
+- **이미 DB에 있는 행은 절대 덮어쓰지 않는다.** 항상 insert만 하고, `sheet_row`(또는 `job_id`)가 이미 있는 행은 건너뛴다(`upsert(..., { ignoreDuplicates: true })`). 그래서 몇 번을 다시 돌려도 배포 후 관리자가 바꾼 상태가 시트의 옛 값으로 되돌아가지 않는다. 모드는 이것 하나뿐이다. 덮어쓰는 모드는 만들지 않는다.
+- 완전히 빈 행은 건너뛴다.
+- `--dry-run`: 쓰지 않고 탭별 읽은 행 수, 새로 들어갈 행 수, 변환 경고를 출력한다.
+- **어긋남 보고**: 이미 DB에 있는 행 중 시트와 상태(`status`)·알림(`notify_status`)·요청사항(`memo`)이 다른 행을 표로 출력한다. 자동으로 고치지 않는다. 전환 중 시트에서 바뀐 값이 있는지 사람이 보고 판단하게 하기 위해서다.
+- 끝나면 탭별 **시트 행 수 / DB에 있는 이전 행 수(`sheet_row` 있는 행)**를 표로 출력하고, 다르면 종료 코드 1로 끝낸다.
 
 변환 규칙 (순수 함수 `src/lib/sheet-import.ts`로 분리, 테스트 대상):
 - 신청일시: `parseSheetDateTime`으로 읽는다. 비었거나 못 읽으면 `null`이고 경고를 출력한다.
@@ -156,23 +170,49 @@
 
 ## 4. 전환 절차
 
-1. Supabase에 `0001_init.sql` 적용
-2. `--dry-run`으로 경고 확인 → 실제 이전 → 건수 대조 통과 확인
-3. Vercel 환경변수에 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` 추가(Production, Preview) → Supabase 버전 배포
-4. 배포 직후 스크립트를 한 번 더 실행: 2~3 사이에 시트로 들어온 신규 신청만 추가로 옮겨진다
-5. 관리자 화면에서 탭별 건수·최근 신청 확인
+사전 준비 (당일 전):
+- Supabase에 `0001_init.sql` 적용
+- Vercel 환경변수에 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKUP_EMAIL` 추가(Production, Preview)
+- `--dry-run`으로 변환 경고를 확인하고, 필요하면 시트 원본을 먼저 정리한다
+
+전환 당일 (약 15분, 신청이 적은 시간대):
+1. **운영자에게 알림: 지금부터 확인 완료 연락이 갈 때까지 관리자 화면에서 상태 변경·일괄 처리를 하지 않는다.** 손님 신청은 계속 받아도 된다.
+2. 스크립트 실행 → 건수 대조 통과 확인
+3. Supabase 버전 배포 → 배포 완료 확인
+4. 스크립트를 한 번 더 실행한다. 2~3 사이에 시트로 들어온 신규 신청만 추가된다(기존 행은 건드리지 않음). **어긋남 보고가 비어 있는지 확인한다.** 1번 약속이 지켜졌다면 비어 있어야 한다. 행이 나오면 해당 건만 관리자 화면에서 직접 맞춘다.
+5. 관리자 화면에서 탭별 건수와 최근 신청을 확인한다 → 운영자에게 "완료" 연락
 6. 시트 파일 이름에 `[보관-수정금지]`를 붙이고 Apps Script 트리거를 해제한다(`removeTriggers`)
 
-되돌리기: 이전 커밋으로 재배포한다. 시트는 지우지 않는다. 4~5 사이에 Supabase에만 들어간 신규 건은 시트로 옮겨 적는다.
+되돌리기: 이전 커밋으로 재배포한다. 시트는 지우지 않는다. 배포 후 Supabase에만 들어간 신규 건은 시트로 옮겨 적는다(전환 직후라면 몇 건 이내다).
 
-## 5. 테스트
+## 5. 무료 플랜 운영 안전장치
+
+Supabase 무료 플랜에는 두 가지 위험이 있다. ① 7일 동안 활동이 없으면 프로젝트가 **일시정지**되고, 그동안 신청이 실패한다. ② 백업을 내려받을 수 없어서 데이터를 잃으면 **복구할 방법이 없다.**
+
+### 일시정지 방지와 장애 감지
+- 새 cron `/api/cron/db-health`를 매일 1회 실행한다(`vercel.json`에 추가, 다른 cron과 같은 `CRON_SECRET` 인증). 각 테이블을 `select id limit 1`로 한 번씩 조회한다. 이 조회가 매일 활동으로 잡혀 일시정지를 막는다. 아침 리포트도 매일 DB를 읽지만, 리포트 로직이 바뀌어도 활동이 유지되도록 따로 둔다.
+- 조회가 실패하면 Slack(`postSlack`)으로 경고를 보낸다. Slack이 설정되지 않았으면 운영자 이메일로 보낸다. "DB 연결 실패 — Supabase 대시보드에서 프로젝트가 일시정지됐는지 확인하세요(Restore 버튼)." 문구를 넣는다.
+- 신청 저장(`appendBooking` 등)이 실패하면 지금처럼 500을 돌려주고, 같은 경고를 보낸다(10분에 한 번으로 제한). 손님이 신청에 실패했는데 아무도 모르는 상황을 막는다.
+
+### 주간 백업
+- 새 cron `/api/cron/weekly-backup`을 매주 월요일 새벽에 실행한다. `bookings`, `retreats`, `open_stays`, `bulk_logs` 전체(`selectAll` 사용)를 JSON 파일 하나로 묶어 Resend 첨부파일로 `BACKUP_EMAIL`에 보낸다. 받는 사람이 없으면 `OPERATOR_EMAIL`로 보낸다.
+- 현재 규모에서 파일은 수백 KB 수준이라 메일 첨부 한도(40MB)에 여유가 있다. 크기가 10MB를 넘으면 메일 본문에 경고를 적는다.
+- 복구 절차를 `docs/runbook-supabase.md`에 적는다. 백업 JSON을 테이블에 다시 넣는 스크립트 `scripts/restore-backup.ts`를 함께 둔다(insert만, 이미 있는 `id`는 건너뜀).
+- 백업에는 연락처 같은 개인정보가 들어 있으므로 받는 메일함은 운영자 전용으로 둔다.
+
+## 6. 테스트
 
 - 기존 순수 로직 테스트(`digest`, `stats`, `list-filter`, `bulk`, `past-booking`, `messaging`, `notify` 등)는 **기대값을 바꾸지 않는다.** `RowRef` 필드명(`rowNum` → `id`)과 `bulk`의 패치 형식만 반영한다.
 - `sheets.test.ts`는 `store.test.ts`로 대체한다. 가짜 Supabase 클라이언트를 주입해 다음을 검증한다.
   - DB 행 → `string[]` 열 순서, 헤더 행, `meta` 길이·순서
   - `created_at` 포맷과 `null` 처리, `total_amount` `null` 처리
   - ref 우선 찾기, 신청일시+연락처 → 연락처 순 대체 탐색
-  - `applyPatches` 반영, DB 오류 전파
-- `sheet-import.test.ts`: 빈 신청일시, `"150,000"`, 숫자 없는 금액, 빈 행, 스냅샷 ref 매핑과 매핑 누락
+  - `applyPatches`가 `apply_booking_patches` rpc를 한 번만 호출하는지, DB 오류 전파
+  - `selectAll`: 2,500행을 1,000개씩 받을 때 2,500행이 모두 나오는지, 정확히 1,000행일 때 멈추는지
+  - `appendBooking`이 새 ref를 돌려주는지
+- `sheet-import.test.ts`: 빈 신청일시, `"150,000"`, 숫자 없는 금액, 빈 행, 스냅샷 ref 매핑과 매핑 누락, 이미 있는 행과의 어긋남 판정
+- 라우트: `booking`·`payment/confirm`이 `notifyBooking`에 ref를 넘기는지
+- 실제 DB 검증(로컬, 실제 Supabase): `apply_booking_patches`에 없는 id를 섞었을 때 **하나도 반영되지 않는지** 확인한다. 이전 스크립트를 두 번 돌리고, 그 사이 DB에서 바꾼 상태가 그대로인지 확인한다.
+- cron: `db-health`가 실패 시 경고를 보내는지(가짜 클라이언트), `weekly-backup`이 네 테이블을 모두 담는지
 - 실제 검증: 로컬에서 실제 Supabase로 살롱 신청 → 관리자 입금확인 → 일괄 처리 → 되돌리기 → 예약 확인 페이지를 한 번 돌린다.
 - 완료 조건: `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` 모두 통과
