@@ -175,7 +175,7 @@
 
 사전 준비 (당일 전):
 - Supabase에 `0001_init.sql` 적용
-- Vercel 환경변수에 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKUP_EMAIL` 추가(Production, Preview)
+- Vercel 환경변수에 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKUP_EMAIL` 추가(Production. Preview는 비우거나 별도 테스트 프로젝트 — 같은 DB면 실제 예약·문자가 나간다, 운영 가이드 참고)
 - `--dry-run`으로 변환 경고를 확인하고, 필요하면 시트 원본을 먼저 정리한다
 
 전환 당일 (약 15분, 신청이 적은 시간대):

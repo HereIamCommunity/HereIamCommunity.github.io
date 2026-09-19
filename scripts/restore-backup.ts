@@ -4,8 +4,12 @@
  * 사용:
  *   npx tsx --env-file=.env.local scripts/restore-backup.ts <백업파일.json> --dry-run
  *   npx tsx --env-file=.env.local scripts/restore-backup.ts <백업파일.json>
+ *   npx tsx --env-file=.env.local scripts/restore-backup.ts <백업파일.json> --force
  *
  * - 원래 id 그대로 넣는다. 이미 있는 id는 건너뛴다(덮어쓰지 않음).
+ *   테이블별로 "새로 넣음 / 이미 있어 건너뜀" 건수를 출력한다.
+ * - 대상 테이블에 이미 행이 있으면 멈춘다. 새 신청이 백업의 id를 먼저 차지했으면 그 백업 행은
+ *   조용히 빠지기 때문이다. 확인한 뒤에만 --force로 진행한다(드라이런은 알리기만 한다).
  * - 끝나면 reset_id_sequences()로 다음 id가 겹치지 않게 맞춘다.
  * - server-only 모듈(store/supabase)은 import하지 않는다.
  */
@@ -28,8 +32,9 @@ function env(name: string): string {
 async function main() {
   const file = process.argv.slice(2).find((a) => !a.startsWith("--"));
   const dry = process.argv.includes("--dry-run");
+  const force = process.argv.includes("--force");
   if (!file) {
-    console.error("사용: npx tsx --env-file=.env.local scripts/restore-backup.ts <백업파일.json> [--dry-run]");
+    console.error("사용: npx tsx --env-file=.env.local scripts/restore-backup.ts <백업파일.json> [--dry-run] [--force]");
     process.exit(2);
   }
 
@@ -38,16 +43,43 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  /* 대상 테이블이 비어 있는지 먼저 본다 */
+  const existing: { table: string; count: number }[] = [];
+  for (const table of BACKUP_TABLES) {
+    const { count, error } = await db.from(table).select("id", { count: "exact", head: true });
+    if (error) throw error;
+    if (count) existing.push({ table, count });
+  }
+  if (existing.length) {
+    console.warn("\n⚠⚠⚠ 대상 테이블에 이미 행이 있습니다 ⚠⚠⚠");
+    for (const e of existing) console.warn(`   ${e.table}: ${e.count}건`);
+    console.warn(
+      "   백업과 같은 id의 행은 건너뛰므로, 그 사이 새 신청이 같은 id를 받았다면 백업 행이 빠집니다.\n" +
+        "   새 프로젝트라면 앱이 신청을 받기 전에 복구해야 합니다. 확인했으면 --force를 붙여 다시 실행하세요.\n"
+    );
+    if (!dry && !force) {
+      console.error("✗ 복구하지 않았습니다(--force 없음).");
+      process.exit(1);
+    }
+  }
+
   for (const table of BACKUP_TABLES) {
     const rows = restorableRows(data[table]);
-    console.log(`${table}: 백업 ${rows.length}건`);
-    if (dry) continue;
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      const { error } = await db
-        .from(table)
-        .upsert(rows.slice(i, i + CHUNK), { onConflict: "id", ignoreDuplicates: true });
-      if (error) throw error;
+    if (dry) {
+      console.log(`${table}: 백업 ${rows.length}건`);
+      continue;
     }
+    let inserted = 0;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      // ignoreDuplicates + select: 실제로 새로 들어간 행만 돌아온다
+      const { data: added, error } = await db
+        .from(table)
+        .upsert(rows.slice(i, i + CHUNK), { onConflict: "id", ignoreDuplicates: true })
+        .select("id");
+      if (error) throw error;
+      inserted += added?.length ?? 0;
+    }
+    console.log(`${table}: 백업 ${rows.length}건 · 새로 넣음 ${inserted}건 · 이미 있어 건너뜀 ${rows.length - inserted}건`);
   }
 
   if (dry) {

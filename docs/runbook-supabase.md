@@ -11,7 +11,11 @@
 | `SUPABASE_SERVICE_ROLE_KEY` | 같은 화면의 service_role 키(또는 secret 키 `sb_secret_…`) | 서버 전용. `NEXT_PUBLIC_` 금지 |
 | `BACKUP_EMAIL` | 주간 백업을 받을 메일 | 비우면 `OPERATOR_EMAIL` |
 
-Vercel: Project > Settings > Environment Variables에 Production·Preview 둘 다 넣는다.
+Vercel: Project > Settings > Environment Variables에 **Production에만** 넣는다.
+
+> ⚠ Preview 배포에 같은 `SUPABASE_URL`을 넣으면 미리보기에서 한 신청이 **실제 예약으로 저장되고
+> 실제 문자도 나간다.** Preview에는 `SUPABASE_*`를 비워두거나(저장 시 오류), 따로 만든 테스트용
+> Supabase 프로젝트의 값을 넣는다.
 
 ## "DB 연결 실패" 경고를 받았을 때
 
@@ -25,6 +29,11 @@ Vercel: Project > Settings > Environment Variables에 Production·Preview 둘 �
 
 ## 백업에서 복구
 
+새로 만든(또는 다시 만든) 프로젝트라면 먼저:
+- SQL Editor에서 `supabase/migrations/0001_init.sql`을 실행해 테이블을 만든다.
+- **앱이 신청을 받기 전에** 복구한다. 복구 전에 들어온 새 신청이 백업의 id를 먼저 차지하면
+  그 백업 행은 건너뛰어져 빠진다. (필요하면 Vercel 환경변수를 잠시 비워 저장을 막는다.)
+
 1. 운영자 메일함에서 가장 최근 `[코이노니아] 주간 백업` 메일의 JSON 첨부를 내려받는다.
 2. 드라이런으로 건수를 확인한다:
    ```bash
@@ -34,7 +43,14 @@ Vercel: Project > Settings > Environment Variables에 Production·Preview 둘 �
    ```bash
    npx tsx --env-file=.env.local scripts/restore-backup.ts ~/Downloads/koinonia-backup-YYYY-MM-DD.json
    ```
-   이미 있는 id는 건너뛰므로 여러 번 돌려도 안전하다. 백업 이후에 생긴 신청은 들어 있지 않다.
+   테이블별로 `백업 N건 · 새로 넣음 X건 · 이미 있어 건너뜀 Y건`을 출력한다.
+   이미 있는 id는 건너뛰므로(덮어쓰지 않음) 다시 돌려도 덮어쓰지 않는다(다시 돌릴 때는 4번처럼 `--force`가 필요). 백업 이후에 생긴 신청은 들어 있지 않다.
+4. 대상 테이블에 이미 행이 있으면 스크립트가 경고하고 **멈춘다**. 건너뛸 행이 생길 수 있어서다.
+   이미 있는 행이 무엇인지 확인한 뒤(예: 부분 복구를 다시 돌리는 중) 진행하려면 `--force`를 붙인다:
+   ```bash
+   npx tsx --env-file=.env.local scripts/restore-backup.ts ~/Downloads/koinonia-backup-YYYY-MM-DD.json --force
+   ```
+   `--force` 뒤에도 "이미 있어 건너뜀"이 0이 아니면, 그 id의 행이 백업과 같은 신청인지 대시보드에서 확인한다.
 
 ## 수기 등록 (전화·현장 예약)
 
