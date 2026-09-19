@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllBookings, getAllRetreats } from "@/lib/sheets";
+import { getAllBookings, getAllRetreats } from "@/lib/store";
 import { buildDigest, parseSheetDateTime } from "@/lib/digest";
 import { RETREAT_SESSIONS, RETREAT_CAPACITY } from "@/lib/retreat-sessions";
 import { Resend } from "resend";

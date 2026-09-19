@@ -20,10 +20,10 @@ import {
 } from "@/lib/bulk-log";
 import { kstToday } from "@/lib/digest";
 import { notifyBooking, notifyStatusText } from "@/lib/messaging";
-import { batchUpdateCells, getAllBookingsWithMeta } from "@/lib/sheets";
+import { applyPatches, getAllBookingsWithMeta } from "@/lib/store";
 import { postSlack } from "@/lib/slack";
 import { buildSimpleBlocks } from "@/lib/slack-blocks";
-import { refCellRange, type RowRef } from "@/lib/row-ref";
+import type { BookingPatch, RowRef } from "@/lib/row-ref";
 
 /**
  * 일괄 처리 — 조건으로 대상을 고르고(preview) 한 번에 실행한다(run).
@@ -44,17 +44,17 @@ import { refCellRange, type RowRef } from "@/lib/row-ref";
  * 응답에 `source: "list" | "filter"` — 어느 조건으로 대상을 골랐는지. `listFilters`면
  * 화면과 **같은** `filterBookings`로 고르므로 목록 건수와 대상 건수가 일치한다.
  *
- * **쿼터 규약(중요)**: 2026-09-10 운영에서 99건을 건별 API로 돌렸다가 행마다 시트를 다시 읽어
- * 읽기 쿼터(429)에 걸렸다. 그래서 run은 **읽기 1회 + batchUpdate 1회**로 끝낸다.
- * notify:true여도 `notifyBooking(..., { recordToSheet: false })`로 발송만 하고
- * O열은 맨 끝에 batchUpdate 한 번으로 몰아 쓴다(행당 읽기 0).
+ * **쓰기 규약(중요)**: 2026-09-10 운영에서 99건을 건별 API로 돌렸다가 읽기 쿼터(429)에 걸렸다.
+ * 그래서 run은 **읽기 1회 + applyPatches 1회**로 끝낸다. applyPatches는 한 트랜잭션이라
+ * 전부 반영되거나 하나도 반영되지 않는다. notify:true여도 `notifyBooking(..., { recordToSheet: false })`로
+ * 발송만 하고 알림 칸은 맨 끝에 applyPatches 한 번으로 몰아 쓴다.
  *
- * GET → `_bulk_log` 최근 20건.
+ * GET → bulk_logs 최근 20건.
  */
 
 const NOTIFY_GAP_MS = 150;
 
-const refKey = (r: RowRef) => `${r.tab}#${r.rowNum}`;
+const refKey = (r: RowRef) => `${r.tab}#${r.id}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function GET(req: NextRequest) {
@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   try {
-    // readBulkLog는 탭이 아직 없을 때만 빈 배열을 준다. 권한·쿼터 오류는 던져서 500으로 드러난다
+    // readBulkLog는 DB 오류를 던진다 — 500으로 드러낸다.
     // — 읽기 실패를 "기록 없음"으로 보여주면 운영자가 되돌리기 대상을 놓친다.
     const jobs = (await readBulkLog(20)).map((e) => ({
       jobId: e.jobId,
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     console.error("[BULK GET] 로그 읽기 실패", e);
     return NextResponse.json(
-      { ok: false, error: "실행 기록을 읽지 못했습니다(시트 오류)." },
+      { ok: false, error: "실행 기록을 읽지 못했습니다(DB 오류)." },
       { status: 500 }
     );
   }
@@ -174,14 +174,14 @@ export async function POST(req: NextRequest) {
     }
 
     // 쓰기 1회
-    if (plan.writes.length > 0) await batchUpdateCells(plan.writes);
+    if (plan.patches.length > 0) await applyPatches(plan.patches);
 
     const failed: { ref: RowRef; name: string; error: string }[] = [];
     let notified = 0;
 
     if (notify && plan.applied.length > 0) {
       const byRef = new Map<string, BulkTarget>(targets.map((t) => [refKey(t.ref), t]));
-      const notifyCells: { range: string; values: string[][] }[] = [];
+      const notifyPatches: BookingPatch[] = [];
 
       for (let i = 0; i < plan.applied.length; i++) {
         const ref = plan.applied[i];
@@ -192,14 +192,11 @@ export async function POST(req: NextRequest) {
 
         if (i > 0) await sleep(NOTIFY_GAP_MS);
         try {
-          // recordToSheet:false — O열은 아래에서 batchUpdate 한 번으로 몰아 쓴다(행당 읽기 0).
+          // recordToSheet:false — 알림 칸은 아래에서 applyPatches 한 번으로 몰아 쓴다(행당 읽기 0).
           const result = await notifyBooking(resolved.event, parseAdminRow(t.row), {
             recordToSheet: false,
           });
-          notifyCells.push({
-            range: refCellRange(ref, "O"),
-            values: [[notifyStatusText(resolved.event, result)]],
-          });
+          notifyPatches.push({ ref, notify: notifyStatusText(resolved.event, result) });
           if (result.guest === "ok") notified++;
           else if (typeof result.guest === "object") {
             failed.push({ ref, name: t.name, error: result.guest.error });
@@ -210,9 +207,9 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (notifyCells.length > 0) {
+      if (notifyPatches.length > 0) {
         try {
-          await batchUpdateCells(notifyCells);
+          await applyPatches(notifyPatches);
         } catch (e) {
           console.error("[BULK] 알림 결과 기록 실패", e);
         }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllBookings } from "@/lib/sheets";
+import { getAllBookings } from "@/lib/store";
 
 const ROOM_MAP: Record<string, string> = {
   nagnae: "나그네방",

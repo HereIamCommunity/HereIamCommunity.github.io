@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { google } from "googleapis";
+import { getAllBookings } from "@/lib/store";
 import { sendCheckoutSMS } from "@/lib/notify";
 
 // 오늘 날짜를 KST 기준 YYYY-MM-DD 형식으로 반환
@@ -15,24 +15,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!process.env.GOOGLE_SHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    return NextResponse.json({ skipped: true, reason: "no sheets config" });
-  }
-
   const today = todayKST();
 
-  const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON!);
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-  });
-  const sheets = google.sheets({ version: "v4", auth });
-
-  const res = await sheets.spreadsheets.values
-    .get({ spreadsheetId: process.env.GOOGLE_SHEET_ID, range: "스테이!A:N" })
-    .catch(() => ({ data: { values: [] } }));
-
-  const rows = (res.data.values as string[][] | null) ?? [];
+  // 스테이만. 행 판정(!row[0] 건너뛰기 포함)은 시트 시절 그대로 둔다 —
+  // 신청일시가 빈 수기 입력 행에 안내 문자가 새로 나가지 않게.
+  const rows = (await getAllBookings()).filter((row) => row[1] === "스테이");
   const sent: string[] = [];
 
   for (const row of rows) {

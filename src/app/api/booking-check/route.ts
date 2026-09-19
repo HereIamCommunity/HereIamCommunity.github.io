@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBookingsByPhone } from "@/lib/sheets";
+import { getBookingsByPhone } from "@/lib/store";
 
 export async function POST(req: NextRequest) {
   try {

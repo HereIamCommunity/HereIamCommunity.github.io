@@ -11,7 +11,7 @@ import {
   type SendBookingResult,
   type SendResult,
 } from "@/lib/kakao";
-import { updateNotifyStatus } from "@/lib/sheets";
+import { updateNotifyStatus } from "@/lib/store";
 import type { RowRef } from "@/lib/row-ref";
 
 const EVENT_SHORT: Record<BookingEvent, string> = {
@@ -82,7 +82,7 @@ export async function notifyBooking(
         opts?.ref
       );
     } catch (e) {
-      console.error("[NOTIFY] 시트 기록 실패", e);
+      console.error("[NOTIFY] 알림 결과 기록 실패", e);
     }
   }
 

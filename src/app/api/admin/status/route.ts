@@ -10,16 +10,16 @@ import {
   updateOpenStayStatus,
   updateRetreatStatus,
   updateNotifyStatus,
-} from "@/lib/sheets";
+} from "@/lib/store";
 
 /**
  * 어드민에서 신청 상태를 바꾼다 (입금확인 / 취소 / 되돌리기).
  *
  * body: { sheet?: "booking" | "retreat" | "open"; row: string[]; action: "confirm" | "cancel" | "reopen";
- *         reason?: string; ref?: { tab: "살롱"|"스테이"|"리트릿"|"무료개방"; rowNum: number } }
+ *         reason?: string; ref?: { tab: "살롱"|"스테이"|"리트릿"|"무료개방"; id: number } }
  * res:  { ok: true; status: string; notify?: NotifyResult } | { ok: false; error: string; status?: string }
  *
- * ref(목록 응답의 meta 원소)가 있으면 시트 행 번호로 직접 읽고 쓴다 — 연락처가 빈 행도 처리된다.
+ * ref(목록 응답의 meta 원소)가 있으면 DB id로 직접 읽고 쓴다 — 연락처가 빈 행도 처리된다.
  * 없으면 기존 방식(신청일시 + 연락처 탐색). 연락처는 더 이상 필수가 아니다.
  *
  * 알림(알림톡/문자)은 예약(booking)에서만 나간다. reopen은 어느 시트든 알림 없음.
@@ -49,11 +49,11 @@ export async function POST(req: NextRequest) {
     /* ── 예약(살롱·스테이) ── */
     const booking = parseAdminRow(row);
 
-    // 현재 시트 상태 확인 (중복 처리 방지)
+    // 현재 상태 확인 (중복 처리 방지)
     const current = await getBookingRow(booking.type, booking.createdAt ?? "", booking.phone, ref);
     if (!current) {
       return NextResponse.json(
-        { ok: false, error: "시트에서 예약 행을 찾지 못했습니다." },
+        { ok: false, error: "예약 행을 찾지 못했습니다." },
         { status: 404 }
       );
     }
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "상태 저장에 실패했습니다." }, { status: 500 });
     }
 
-    // 취소 사유는 요청사항(M열)에 남긴다. 실패해도 상태 변경은 이미 끝났으니 막지 않는다.
+    // 취소 사유는 요청사항에 남긴다. 실패해도 상태 변경은 이미 끝났으니 막지 않는다.
     if (action === "cancel" && reason?.trim()) {
       try {
         await appendBookingMemo(
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!resolved.event || !wantNotify) {
-      // notify:false — 일괄 정리 등 알림 없이 상태만 바꿀 때. O열엔 "🔕 HH:MM 확정 알림 없음"을 남긴다.
+      // notify:false — 일괄 정리 등 알림 없이 상태만 바꿀 때. 알림 칸엔 "🔕 HH:MM 확정 알림 없음"을 남긴다.
       if (!wantNotify && resolved.event) {
         try {
           await updateNotifyStatus(booking.type, booking.createdAt ?? "", booking.phone, silentStatusText(resolved.event), ref);
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
 
 /**
  * 리트릿·무료개방: 알림 없이 상태만 바꾼다.
- * 행 식별은 ref(시트 행 번호) 우선, 없으면 신청일시(A) + 연락처(C).
+ * 행 식별은 ref(DB id) 우선, 없으면 신청일시(A) + 연락처(C).
  * 상태 열은 리트릿 M(12), 무료개방 L(11).
  */
 async function handleSimpleSheet(
@@ -149,7 +149,7 @@ async function handleSimpleSheet(
 
   if (!updated) {
     return NextResponse.json(
-      { ok: false, error: "시트에서 신청 행을 찾지 못했습니다." },
+      { ok: false, error: "신청 행을 찾지 못했습니다." },
       { status: 404 }
     );
   }

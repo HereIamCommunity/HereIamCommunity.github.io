@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { appendBooking } from "@/lib/sheets";
+import { appendBooking } from "@/lib/store";
 import { notifyBooking } from "@/lib/messaging";
 import { sendOperatorAlert, sendGuestConfirmation } from "@/lib/email";
 
@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
       memo: data.memo,
     };
 
-    // ── 1. 구글 시트에 저장 (알림 실패가 저장을 막지 않도록 먼저) ──
-    await appendBooking({
+    // ── 1. DB에 저장 (알림 실패가 저장을 막지 않도록 먼저) ──
+    const ref = await appendBooking({
       type: data.type,
       createdAt,
       name: data.name,
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       status: "신청",
     });
 
-    // ── 2. 접수 알림톡/문자 발송 + O열 기록 ─────────────
+    // ── 2. 접수 알림톡/문자 발송 + 방금 저장한 행에 결과 기록 ──
     try {
       await notifyBooking("received", {
         type: data.type === "salon" ? "salon" : "stay",
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
         discount: data.discount ?? "none",
         totalAmount: data.totalAmount ?? 0,
         via: "web",
-      });
+      }, { ref: ref ?? undefined });
     } catch (e) {
       console.error("[NOTIFY] ✗ 접수 알림", e);
     }

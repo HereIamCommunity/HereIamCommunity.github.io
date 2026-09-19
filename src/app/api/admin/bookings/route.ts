@@ -3,14 +3,14 @@ import {
   getAllBookingsWithMeta,
   getAllRetreatsWithMeta,
   getAllOpenStaysWithMeta,
-} from "@/lib/sheets";
+} from "@/lib/store";
 
 /**
  * 어드민 목록.
  * res: { rows, retreats, openStays, meta, retreatMeta, openMeta }
  *
- * meta는 rows와 **길이·순서가 같다**(meta[0]은 헤더 행). 각 원소는 { tab, rowNum } —
- * 그 행의 시트 탭과 1-based 시트 행 번호다. 상태 변경·재발송 때 body의 ref로 그대로 넘기면
+ * meta는 rows와 **길이·순서가 같다**(meta[0]은 헤더 자리, id 0). 각 원소는 { tab, id } —
+ * 그 행의 탭과 DB id다. 상태 변경·재발송 때 body의 ref로 그대로 넘기면
  * 연락처가 빈 행도 정확히 찾아 쓴다. retreatMeta·openMeta도 같은 규칙.
  */
 export async function GET(req: NextRequest) {

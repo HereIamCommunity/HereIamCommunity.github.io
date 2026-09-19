@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { appendOpenStay } from "@/lib/sheets";
+import { appendOpenStay } from "@/lib/store";
 import { Resend } from "resend";
 import { postSlack } from "@/lib/slack";
 import { buildSimpleBlocks } from "@/lib/slack-blocks";

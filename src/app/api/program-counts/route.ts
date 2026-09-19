@@ -1,29 +1,15 @@
 import { NextResponse } from "next/server";
-import { google } from "googleapis";
+import { getAllBookings } from "@/lib/store";
 
+/** 살롱 프로그램별 신청 인원 (취소 제외) */
 export async function GET() {
-  if (!process.env.GOOGLE_SHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    return NextResponse.json({ counts: {} });
-  }
-
   try {
-    const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON!);
-    const auth = new google.auth.GoogleAuth({
-      credentials,
-      scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
-    });
-    const sheets = google.sheets({ version: "v4", auth });
-
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "살롱!A:N",
-    });
-
-    const rows = (res.data.values as string[][] | null) ?? [];
+    const rows = await getAllBookings();
     const counts: Record<string, number> = {};
 
     for (const row of rows) {
       if (!row[0] || row[0] === "신청일시") continue;
+      if (row[1] !== "살롱") continue;
       const status = row[13] ?? "";
       if (status === "취소") continue;
       const program = row[4] ?? "";

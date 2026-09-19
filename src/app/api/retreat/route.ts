@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { appendRetreat, getRetreatCounts } from "@/lib/sheets";
+import { appendRetreat, getRetreatCounts } from "@/lib/store";
 import { sendOperatorAlert, sendRetreatConfirmation } from "@/lib/email";
 import { postSlack } from "@/lib/slack";
 import { buildSimpleBlocks } from "@/lib/slack-blocks";
