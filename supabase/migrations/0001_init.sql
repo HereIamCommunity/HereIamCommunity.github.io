@@ -91,6 +91,11 @@ alter table public.open_stays enable row level security;
 alter table public.bulk_logs  enable row level security;
 revoke all on table public.bookings, public.retreats, public.open_stays, public.bulk_logs
   from anon, authenticated;
+-- Supabase는 기본 권한 부여를 없애는 중이다. 명시하지 않으면 service_role 호출도 42501로 거부되고
+-- reset_id_sequences()의 setval도 실패한다.
+grant select, insert, update, delete on table public.bookings, public.retreats, public.open_stays, public.bulk_logs
+  to service_role;
+grant usage, select, update on all sequences in schema public to service_role;
 
 -- ── 일괄 처리: 한 트랜잭션으로 전부 반영하거나 하나도 반영하지 않는다 ──
 -- patches: [{ "id": 12, "status": "입금확인", "notify": "🔕 14:32 확정 알림 없음" }, ...]
