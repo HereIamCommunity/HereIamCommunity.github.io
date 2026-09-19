@@ -4,6 +4,7 @@
  * 무료 플랜은 7일 동안 활동이 없으면 프로젝트가 일시정지된다. 그러면 모든 저장이 실패하므로
  * 경고에 "대시보드에서 Restore" 안내를 넣는다. 슬랙이 1순위, 안 되면 운영자 메일.
  * 신청이 몰릴 때 경고가 쏟아지지 않게 10분에 한 번으로 제한한다(인스턴스 단위).
+ * 제한은 슬랙·메일 전송에만 걸린다. 로그는 실패마다 남긴다.
  */
 
 import { sendOperatorNotice } from "@/lib/email";
@@ -34,11 +35,11 @@ export async function reportDbFailure(
   err: unknown,
   now: number = Date.now()
 ): Promise<"slack" | "email" | "throttled" | "failed"> {
-  if (lastSentAt !== null && now - lastSentAt < DB_ALERT_THROTTLE_MS) return "throttled";
-  lastSentAt = now;
-
   const detail = errorText(err);
   console.error(`[DB-ALERT] ${context}: ${detail}`);
+
+  if (lastSentAt !== null && now - lastSentAt < DB_ALERT_THROTTLE_MS) return "throttled";
+  lastSentAt = now;
 
   try {
     const res = await postSlack(
@@ -57,8 +58,8 @@ export async function reportDbFailure(
   }
 
   try {
-    await sendOperatorNotice("[코이노니아] DB 연결 실패", `작업: ${context}\n오류: ${detail}\n\n${HINT}`);
-    return "email";
+    const sent = await sendOperatorNotice("[코이노니아] DB 연결 실패", `작업: ${context}\n오류: ${detail}\n\n${HINT}`);
+    return sent ? "email" : "failed";
   } catch (e) {
     console.error("[DB-ALERT] 메일 전송 실패", e);
     return "failed";

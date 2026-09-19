@@ -27,10 +27,26 @@ describe("reportDbFailure", () => {
 
   it("슬랙이 안 되면 운영자 메일로", async () => {
     mocks.postSlack.mockResolvedValue({ ok: false, error: "not-configured" });
-    mocks.sendOperatorNotice.mockResolvedValue(undefined);
+    mocks.sendOperatorNotice.mockResolvedValue(true);
     expect(await reportDbFailure("예약 저장", { message: "paused" }, 1_000)).toBe("email");
     expect(mocks.sendOperatorNotice.mock.calls[0][0]).toContain("DB 연결 실패");
     expect(mocks.sendOperatorNotice.mock.calls[0][1]).toContain("paused");
+  });
+
+  it("슬랙이 안 되고 메일도 설정이 없어 건너뛰면 failed (보낸 척하지 않는다)", async () => {
+    mocks.postSlack.mockResolvedValue({ ok: false, error: "not-configured" });
+    mocks.sendOperatorNotice.mockResolvedValue(false);
+    expect(await reportDbFailure("예약 저장", "x", 1_000)).toBe("failed");
+  });
+
+  it("보내기를 건너뛴(throttled) 실패도 로그는 남긴다", async () => {
+    mocks.postSlack.mockResolvedValue({ ok: true });
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await reportDbFailure("a", "x", 1_000);
+    expect(await reportDbFailure("b", "boom", 1_001)).toBe("throttled");
+    expect(errSpy).toHaveBeenCalledWith("[DB-ALERT] b: boom");
+    expect(mocks.postSlack).toHaveBeenCalledTimes(1);
+    errSpy.mockRestore();
   });
 
   it("10분 안에는 다시 보내지 않는다 (신청이 몰릴 때 폭탄 방지)", async () => {

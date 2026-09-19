@@ -12,7 +12,8 @@ import { dumpAllTables } from "@/lib/store";
  */
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (secret !== process.env.CRON_SECRET) {
+  // CRON_SECRET이 없으면 undefined === undefined로 누구나 통과하므로 막는다
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
       ? `\n⚠ 백업 파일이 ${(backup.bytes / 1024 / 1024).toFixed(1)}MB입니다. 메일 첨부 한도(40MB)에 가까워지면 백업 방식을 바꿔야 합니다.\n`
       : "";
 
-    await sendOperatorNotice(
+    const sent = await sendOperatorNotice(
       `[코이노니아] 주간 백업 ${backup.filename.slice(16, 26)}`,
       `첨부된 JSON 파일이 이번 주 전체 데이터입니다. 지우지 말고 보관해주세요.\n\n${lines.join("\n")}\n${warn}\n복구 방법: docs/runbook-supabase.md`,
       {
@@ -31,6 +32,14 @@ export async function GET(req: NextRequest) {
         attachments: [{ filename: backup.filename, content: Buffer.from(backup.json) }],
       }
     );
+    if (!sent) {
+      // 메일이 안 나갔는데 성공이라 하면 백업이 없는 줄 모르고 지나간다
+      await reportDbFailure(
+        "주간 백업 (메일 미설정)",
+        new Error("RESEND_API_KEY가 없어 백업 메일을 보내지 못했습니다")
+      );
+      return NextResponse.json({ ok: false, reason: "email-not-configured" }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true, counts: backup.counts, bytes: backup.bytes });
   } catch (e) {

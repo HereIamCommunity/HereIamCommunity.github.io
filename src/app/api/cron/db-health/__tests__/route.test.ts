@@ -27,6 +27,12 @@ describe("GET /api/cron/db-health", () => {
     expect(mocks.checkDbHealth).not.toHaveBeenCalled();
   });
 
+  it("CRON_SECRET이 설정되지 않았으면 헤더 없이 401", async () => {
+    delete process.env.CRON_SECRET;
+    expect((await GET(req())).status).toBe(401);
+    expect(mocks.checkDbHealth).not.toHaveBeenCalled();
+  });
+
   it("정상이면 200과 점검한 테이블", async () => {
     mocks.checkDbHealth.mockResolvedValue({ ok: true, tables: ["bookings"] });
     const res = await GET(req("Bearer s3cret"));

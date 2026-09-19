@@ -9,7 +9,8 @@ import { checkDbHealth } from "@/lib/store";
  */
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (secret !== process.env.CRON_SECRET) {
+  // CRON_SECRET이 없으면 undefined === undefined로 누구나 통과하므로 막는다
+  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

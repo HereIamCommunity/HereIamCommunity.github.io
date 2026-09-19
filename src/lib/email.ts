@@ -204,17 +204,18 @@ export async function sendRetreatConfirmation({
 
 /**
  * 운영자에게 텍스트 메일을 보낸다. 첨부파일(주간 백업 JSON)도 받는다.
- * RESEND_API_KEY가 없으면 경고만 남긴다. 전송 오류는 던진다 — 호출부가 실패를 알아야 한다.
+ * 보냈으면 true. RESEND_API_KEY가 없어 건너뛰었으면 경고를 남기고 false — 호출부가 "보냈다"고 착각하지 않게.
+ * 전송 오류는 던진다 — 호출부가 실패를 알아야 한다.
  */
 export async function sendOperatorNotice(
   subject: string,
   text: string,
   opts: { to?: string; attachments?: { filename: string; content: Buffer }[] } = {}
-): Promise<void> {
+): Promise<boolean> {
   const resend = getResend();
   if (!resend) {
     console.warn("[EMAIL] RESEND_API_KEY 미설정 — 운영 알림 메일 건너뜀:", subject);
-    return;
+    return false;
   }
   const { error } = await resend.emails.send({
     from: FROM_EMAIL,
@@ -224,4 +225,5 @@ export async function sendOperatorNotice(
     attachments: opts.attachments,
   });
   if (error) throw new Error(`[EMAIL] ${error.message}`);
+  return true;
 }
