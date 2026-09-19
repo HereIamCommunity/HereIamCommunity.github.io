@@ -48,4 +48,25 @@ describe("POST /api/payment/confirm", () => {
       { ref: { tab: "스테이", id: 7 } }
     );
   });
+
+  it("결제는 승인됐는데 예약 저장이 실패하면 수동 확인용 정보를 남기고 500", async () => {
+    mocks.appendBooking.mockRejectedValue(new Error("db down"));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const bookingData = { type: "stay", name: "홍", phone: "010-1", room: "옥순방" };
+
+    const res = await POST(
+      new NextRequest("http://localhost/api/payment/confirm", {
+        method: "POST",
+        body: JSON.stringify({ paymentKey: "pk", orderId: "o1", amount: 240000, bookingData }),
+      })
+    );
+
+    expect(res.status).toBe(500);
+    expect(errSpy).toHaveBeenCalledWith(
+      "[PAYMENT] 결제는 승인됐지만 예약 저장 실패 — 수동 확인 필요",
+      expect.objectContaining({ orderId: "o1", paymentKey: "pk", amount: 240000, bookingData })
+    );
+    expect(mocks.notifyBooking).not.toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
 });

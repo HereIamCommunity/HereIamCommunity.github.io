@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
     };
 
     // 예약 저장 (알림 실패가 저장을 막지 않도록 먼저)
+    // 여기서 실패하면 돈은 이미 결제됐는데 예약이 없다 → 운영자가 찾을 수 있게 결제 정보를 남기고 던진다
     const ref = await appendBooking({
       type: bookingData.type,
       createdAt,
@@ -57,6 +58,11 @@ export async function POST(req: NextRequest) {
       totalAmount: amount,
       memo: `[카드결제완료] ${tossData.method ?? ""} · ${tossData.cardNumber ?? tossData.virtualAccount?.accountNumber ?? ""}`,
       status: "결제완료",
+    }).catch((e) => {
+      console.error("[PAYMENT] 결제는 승인됐지만 예약 저장 실패 — 수동 확인 필요", {
+        orderId, paymentKey, amount, bookingData,
+      });
+      throw e;
     });
 
     // ── 3. 확정 알림톡/문자 발송 + 방금 저장한 행에 결과 기록 ──
