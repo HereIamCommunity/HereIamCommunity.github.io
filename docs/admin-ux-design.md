@@ -177,6 +177,8 @@ export function buildStats(bookings: string[][], now?: Date): Stats; // 헤더 �
 ## 6. 운영 피드백 반영 (2026-09-08, 배포 후)
 
 ### 6.1 행 식별을 시트 행 번호로 (Max)
+> 2026-09-19 Supabase 이전으로 `{ tab, rowNum }`은 `{ tab, id }`(DB 기본키)로 바뀌었다. meta의 헤더 자리는 `id: 0`. 설계: `docs/superpowers/specs/2026-09-19-supabase-migration-design.md`
+
 - 문제: 연락처·신청일시가 빈 행(시트에 손으로 넣은 스테이 10건)은 `findBookingRow`가 못 찾아 입금확인이 400 "예약 정보가 없습니다"로 실패. 화면엔 작은 글씨로만 남아 "아무것도 안 뜨는" 것처럼 보임.
 - `getAllBookings`가 각 행에 **출처 탭과 시트 행 번호**를 붙인다: 반환 형태를 `{ header, rows: { tab: "살롱"|"스테이", rowNum: number, values: string[] }[] }`로 바꾸지 말고, 호환 위해 기존 `string[][]`는 유지하되 **각 행 끝에 숨은 열 없이** 별도 배열 `meta: { tab, rowNum }[]`를 `/api/admin/bookings` 응답에 추가한다 (`{ rows, retreats, openStays, meta }`). 리트릿·무료개방도 동일하게 `retreatMeta`, `openMeta`.
 - `POST /api/admin/status`·`/resend` body에 `ref?: { tab: string; rowNum: number }` 추가. `ref`가 있으면 **행 번호로 직접** 읽고 쓴다(`findBookingRow` 우회). 없으면 기존 방식. `updateNotifyStatus`·`updateBookingStatus`·`appendBookingMemo`에 `ref` 인자 경로 추가.
