@@ -9,6 +9,7 @@
  *   예외: `getRetreatCounts`는 신청 페이지가 죽지 않게 0으로 채워 돌려준다.
  */
 
+import { BACKUP_TABLES, type BackupData } from "@/lib/backup";
 import { reportDbFailure } from "@/lib/db-alert";
 import { getDb } from "@/lib/supabase";
 import { fetchAllPages, type PageResult } from "@/lib/paginate";
@@ -46,7 +47,7 @@ import {
 export type { BookingCheckResult, BookingRow, OpenStayRow, RetreatRow } from "@/lib/store-rows";
 export type { RowMeta, RowRef, SheetTab } from "@/lib/row-ref";
 
-type Table = "bookings" | "retreats" | "open_stays";
+type Table = "bookings" | "retreats" | "open_stays" | "bulk_logs";
 type List = { rows: string[][]; meta: RowMeta[] };
 
 /** 테이블 전체(또는 연락처 숫자로 좁힌 전체)를 id 순으로 끝까지 읽는다. */
@@ -320,4 +321,16 @@ export async function checkDbHealth(): Promise<
     if (error) return { ok: false, table, error };
   }
   return { ok: true, tables: [...HEALTH_TABLES] };
+}
+
+/* ─── 백업 ─────────────────────────────────────── */
+
+/** 네 테이블 전체(모든 컬럼)를 끝까지 읽는다. 주간 백업 cron용. */
+export async function dumpAllTables(): Promise<BackupData> {
+  if (!getDb()) throw new Error("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 미설정");
+  const out = {} as BackupData;
+  for (const t of BACKUP_TABLES) {
+    out[t] = await allRows<Record<string, unknown>>(t, "*");
+  }
+  return out;
 }
