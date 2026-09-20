@@ -32,12 +32,6 @@ const potluckDates = [
     price: "10,000원",
     desc: "명절 음식 한 상 차리고, 윷놀이부터 각종 오락까지—코이노니아식 추석 전야제.",
   },
-  {
-    date: "9월 30일 (수)",
-    title: "탈춤포틀럭 💃",
-    price: "10,000원",
-    desc: "축제 한복판에서 맞는 수요일, 먹고 마시고 탈춤판까지 함께 갑시다.",
-  },
 ];
 
 const fridayDates = [
@@ -189,6 +183,20 @@ export default function SalonPage() {
                   <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>
                 </div>
               ))}
+              <div className="border-l-2 border-[#ff6b35]/30 pl-5 py-1">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-[#ff6b35] font-semibold tracking-wide">9월 30일 (수)</p>
+                  <span className="text-xs text-gray-400">10,000원</span>
+                </div>
+                <p className="font-medium text-[#372a14] text-sm mb-1">탈춤 포틀럭 파티 💃</p>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  탈춤축제 기간 포틀럭이라{" "}
+                  <a href="/talchum#booking" className="text-[#ff6b35] font-medium hover:underline">
+                    탈춤축제 페이지
+                  </a>
+                  에서 신청받습니다.
+                </p>
+              </div>
             </div>
           </div>
           <a

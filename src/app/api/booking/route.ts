@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { appendBooking } from "@/lib/sheets";
+import { appendBooking, getSalonCounts } from "@/lib/sheets";
+import { isBookingFull } from "@/lib/programs";
 import { notifyBooking } from "@/lib/messaging";
 import { sendOperatorAlert, sendGuestConfirmation } from "@/lib/email";
 
@@ -9,6 +10,20 @@ export async function POST(req: NextRequest) {
     const createdAt = new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 
     console.log("[BOOKING]", createdAt, JSON.stringify(data, null, 2));
+
+    // ── 0. 정원이 있으면 마감을 서버에서 다시 확인 ──────────────
+    // 신청 폼은 진입 시점의 집계로 잔여를 그리므로, 30분 2명짜리 슬롯처럼
+    // 정원이 촘촘한 건 화면을 열어둔 사이 차버릴 수 있다.
+    if (data.type === "salon") {
+      const counts = await getSalonCounts();
+      if (isBookingFull(data.program, data.date, counts)) {
+        console.log(`[BOOKING] 마감 거절 — ${data.program} / ${data.date}`);
+        return NextResponse.json(
+          { success: false, message: "방금 마감되었습니다. 다른 날짜나 시간대를 선택해주세요." },
+          { status: 409 }
+        );
+      }
+    }
 
     const bookingPayload = {
       type: data.type,
