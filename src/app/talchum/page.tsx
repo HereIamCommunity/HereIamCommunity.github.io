@@ -6,7 +6,7 @@ import { TALCHUM_PROGRAMS } from "@/lib/programs";
 export const metadata = {
   title: "안동탈춤축제 코이노니아와 함께 즐겨요 | 코이노니아",
   description:
-    "2026 안동국제탈춤페스티벌(9/24–10/4) 기간, 코이노니아에서 여는 포틀럭 파티·무비올나잇·DJ 레이브·탈춤런·컨택 잼 워크숍·명상 & 샌드아트 등 프로그램 신청.",
+    "안동국제탈춤페스티벌(9/26–10/5) 기간, 코이노니아는 9/24–10/4 포틀럭 파티·무비올나잇·DJ 레이브·탈춤런·컨택 잼·명상 등 열두 가지 프로그램을 직접 기획·운영합니다.",
 };
 
 const TALCHUM_GROUPS: ProgramGroup[] = [
@@ -166,13 +166,23 @@ export default function TalchumPage() {
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-14 items-center">
           <div>
             <p className="text-[#ff6b35] text-xs tracking-[0.35em] uppercase mb-4 font-medium">
-              Andong Maskdance Festival · 2026.09.24 – 10.04
+              Andong Maskdance Festival
             </p>
             <h1 className="text-3xl md:text-5xl font-light text-[#9e2540] tracking-tight leading-tight mb-5">
               우리 같이<br />
               안동국제탈춤페스티벌<br />
               즐겨요!
             </h1>
+            <div className="flex flex-col gap-1.5 mb-6">
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-[#9e2540]/50 font-medium w-24 shrink-0">탈춤축제</span>
+                <span className="text-[#372a14]/70">2026. 9. 26 – 10. 5</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-[#ff6b35] font-medium w-24 shrink-0">코이노니아</span>
+                <span className="text-[#372a14]/70">2026. 9. 24 – 10. 4</span>
+              </div>
+            </div>
             <p className="text-[#372a14]/60 text-sm leading-relaxed mb-8 max-w-sm">
               축제 기간 동안 코이노니아에서 즐기는 법. 포틀럭부터 무비올나잇, DJ 레이브,
               탈춤런, 컨택 잼, 명상까지 열두 가지 프로그램을 준비했어요.
