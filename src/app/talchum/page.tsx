@@ -267,6 +267,45 @@ export default function TalchumPage() {
         </div>
       </section>
 
+      {/* ── 코이노니아 메시지 ── */}
+      <section className="py-20 md:py-28 px-6 md:px-16 bg-[#372a14] text-center">
+        <div className="max-w-xl mx-auto">
+          <p className="text-[#ff6b35] text-xs tracking-[0.3em] uppercase mb-10 font-medium">
+            우리가 이 모든 걸 준비한 이유
+          </p>
+          <div className="text-white/80 text-base md:text-lg font-light leading-[2] space-y-6 text-left md:text-center">
+            <p>
+              서로 사랑하는 세상이 있었대<br />
+              거기선 둘러 앉아 함께 밥을 먹는대<br />
+              배고픈 사람의 그릇에는<br />
+              어느새 빵이 하나 더 놓이고<br />
+              외로운 사람 곁에는<br />
+              함께 앉아주는 자리가 생긴대
+            </p>
+            <p>
+              늑대와 어린양이 함께 놀듯<br />
+              서로 달라 두려웠던 이들도<br />
+              천천히 각자의 이야기를 들었대<br />
+              작은 목소리도 바람에 흩어지지 않았대
+            </p>
+            <p>
+              그렇게 웃고 울고 격려하고<br />
+              보살피는 식사가 끝나면<br />
+              아무도 내일이 걱정되지 않았대
+            </p>
+          </div>
+          <p className="mt-12 text-white text-xl md:text-2xl font-light tracking-wide">
+            어때? 우리 같이 가볼래?
+          </p>
+          <a
+            href="#booking"
+            className="mt-8 inline-block bg-[#ff6b35] text-white text-sm font-semibold px-8 py-3.5 rounded-full hover:bg-[#e55a25] transition-colors"
+          >
+            프로그램 신청하기
+          </a>
+        </div>
+      </section>
+
       {/* ── 일정표 ── */}
       <section id="calendar" className="py-14 md:py-16 px-6 md:px-16 bg-[#faf9f7] scroll-mt-16">
         <div className="max-w-3xl mx-auto">
