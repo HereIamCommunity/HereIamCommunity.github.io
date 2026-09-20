@@ -1,9 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import HomePrograms from "@/components/HomePrograms";
+import FestivalPopup from "@/components/FestivalPopup";
 export default function Home() {
   return (
     <div className="bg-[#faf9f7]">
+      <FestivalPopup />
 
       {/* ── 1. Hero: 타입 + 사진 분할 ── */}
       <section className="min-h-screen flex flex-col md:flex-row">
