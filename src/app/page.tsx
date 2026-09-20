@@ -1,6 +1,5 @@
 import Image from "next/image";
 import Link from "next/link";
-import HomePrograms from "@/components/HomePrograms";
 import FestivalPopup from "@/components/FestivalPopup";
 export default function Home() {
   return (
@@ -85,10 +84,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── 2. 이번 달 프로그램 미리보기 ── */}
-      <HomePrograms />
-
-      {/* ── 3. 살롱 + 스테이: 교차 에디토리얼 ── */}
+      {/* ── 2. 살롱 + 스테이: 교차 에디토리얼 ── */}
       {[
         {
           href: "/salon",
