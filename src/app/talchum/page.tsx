@@ -166,19 +166,16 @@ export default function TalchumPage() {
         <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-14 items-center">
           <div>
             <p className="text-[#ff6b35] text-xs tracking-[0.35em] uppercase mb-4 font-medium">
-              Andong Maskdance Festival
+              Andong Maskdance Festival · 2026.09.24 – 10.04
             </p>
             <h1 className="text-3xl md:text-5xl font-light text-[#9e2540] tracking-tight leading-tight mb-5">
-              우리 같이<br />
-              안동국제탈춤페스티벌<br />
-              즐겨요!
+              놀이 빼면 시체인<br />
+              코이노니아가<br />
+              준비했어요.
             </h1>
-            <p className="text-[#9e2540]/70 text-lg font-medium tracking-wide mb-6">
-              2026.09.24 – 10.04
-            </p>
             <p className="text-[#372a14]/60 text-sm leading-relaxed mb-8 max-w-sm">
-              축제 기간 동안 코이노니아에서 즐기는 법. 포틀럭부터 무비올나잇, DJ 레이브,
-              탈춤런, 컨택 잼, 명상까지 열두 가지 프로그램을 준비했어요.
+              안동에서 제일 큰 축제 기간에 가만히 있을 수 없어서 기획했습니다.
+              포틀럭·무비올나잇·DJ 레이브·탈춤런·컨택 잼·명상까지 — 열두 가지 프로그램, 전부 코이노니아가 직접 만들었어요.
             </p>
             <div className="flex flex-wrap gap-3">
               <a
@@ -204,6 +201,26 @@ export default function TalchumPage() {
               className="w-full max-w-sm h-auto rounded-2xl shadow-sm"
             />
           </div>
+        </div>
+      </section>
+
+      {/* ── 코이노니아 소개 (처음 오는 사람을 위해) ── */}
+      <section className="bg-[#372a14] px-6 md:px-16 py-10 md:py-12">
+        <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <p className="text-[#ff6b35] text-xs tracking-[0.3em] uppercase mb-3 font-medium">코이노니아가 뭔데?</p>
+            <p className="text-white text-base md:text-lg font-light leading-relaxed max-w-xl">
+              안동 구도심에 있는 문화 공간이에요. 살롱 모임, 게스트하우스, 스토어를 운영하며
+              일, 놀이, 쉼을 함께 만들어가는 곳입니다. 밥도 먹고 술도 마시고 게임도 하고 공연도 봐요.
+              낯선 사람이 앉아도 어색하지 않은 자리를 만들어왔어요.
+            </p>
+          </div>
+          <a
+            href="/about"
+            className="shrink-0 text-white/50 text-sm hover:text-[#ff6b35] transition-colors flex items-center gap-2"
+          >
+            더 알아보기 →
+          </a>
         </div>
       </section>
 

@@ -40,8 +40,8 @@ export default function FestivalPopup() {
           ×
         </button>
 
-        {/* 포스터 이미지 — 클릭 시 살롱 페이지로 */}
-        <Link href="/salon" onClick={close}>
+        {/* 포스터 이미지 — 클릭 시 탈춤축제 페이지로 */}
+        <Link href="/talchum" onClick={close}>
           <Image
             src="/images/talchum-festival-poster.png"
             alt="안동국제탈춤페스티벌 × 코이노니아 살롱"
@@ -61,11 +61,11 @@ export default function FestivalPopup() {
             오늘 하루 안 보기
           </button>
           <Link
-            href="/salon"
+            href="/talchum"
             onClick={close}
             className="flex-1 bg-[#ff6b35] text-white text-sm py-3 text-center font-medium hover:bg-[#e55a25] transition-colors"
           >
-            예약하러 가기 →
+            프로그램 보러가기 →
           </Link>
         </div>
       </div>
