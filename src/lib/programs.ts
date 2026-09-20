@@ -165,7 +165,7 @@ export function festivalDayLabel(iso: string): string {
 }
 
 /** 휴무일 — 카드뉴스 캘린더의 "29 휴무". 상시 프로그램 선택지에서 뺀다. */
-export const FESTIVAL_CLOSED_DAYS = ["2026-09-29"];
+export const FESTIVAL_CLOSED_DAYS = ["2026-09-29", "2026-10-04"];
 
 /** 축제 기간 중 문을 여는 날짜 (ISO) */
 export const FESTIVAL_DAYS: string[] = (() => {
