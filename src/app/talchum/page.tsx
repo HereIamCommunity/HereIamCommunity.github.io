@@ -169,13 +169,13 @@ export default function TalchumPage() {
               Andong Maskdance Festival · 2026.09.24 – 10.04
             </p>
             <h1 className="text-3xl md:text-5xl font-light text-[#9e2540] tracking-tight leading-tight mb-5">
-              놀이 빼면 시체인<br />
-              코이노니아가<br />
-              준비했어요.
+              우리 같이<br />
+              안동국제탈춤페스티벌<br />
+              즐겨요!
             </h1>
             <p className="text-[#372a14]/60 text-sm leading-relaxed mb-8 max-w-sm">
-              안동에서 제일 큰 축제 기간에 가만히 있을 수 없어서 기획했습니다.
-              포틀럭·무비올나잇·DJ 레이브·탈춤런·컨택 잼·명상까지 — 열두 가지 프로그램, 전부 코이노니아가 직접 만들었어요.
+              축제 기간 동안 코이노니아에서 즐기는 법. 포틀럭부터 무비올나잇, DJ 레이브,
+              탈춤런, 컨택 잼, 명상까지 열두 가지 프로그램을 준비했어요.
             </p>
             <div className="flex flex-wrap gap-3">
               <a
