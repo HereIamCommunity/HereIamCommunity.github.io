@@ -173,16 +173,6 @@ export default function TalchumPage() {
               안동국제탈춤페스티벌<br />
               즐겨요!
             </h1>
-            <div className="flex flex-col gap-1.5 mb-6">
-              <div className="flex items-center gap-3 text-sm">
-                <span className="text-[#9e2540]/50 font-medium w-24 shrink-0">탈춤축제</span>
-                <span className="text-[#372a14]/70">2026. 9. 26 – 10. 5</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm">
-                <span className="text-[#ff6b35] font-medium w-24 shrink-0">코이노니아</span>
-                <span className="text-[#372a14]/70">2026. 9. 24 – 10. 4</span>
-              </div>
-            </div>
             <p className="text-[#372a14]/60 text-sm leading-relaxed mb-8 max-w-sm">
               축제 기간 동안 코이노니아에서 즐기는 법. 포틀럭부터 무비올나잇, DJ 레이브,
               탈춤런, 컨택 잼, 명상까지 열두 가지 프로그램을 준비했어요.
