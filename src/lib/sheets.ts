@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import { RETREAT_SESSIONS } from "@/lib/retreat-sessions";
+import { countKey } from "@/lib/programs";
 import {
   attachRowMeta,
   mergeBookingRowsWithMeta,
@@ -753,4 +754,38 @@ export async function batchUpdateCells(data: { range: string; values: string[][]
     requestBody: { valueInputOption: "USER_ENTERED", data },
   });
   return res.data.totalUpdatedCells ?? 0;
+}
+
+/**
+ * 살롱 탭의 '프로그램 + 일시' 별 신청 인원.
+ * 정원(`Program.capacity`)은 이 키 하나당 인원이라, 신청 폼의 잔여 표시와
+ * 접수 API의 마감 확인이 같은 집계를 쓴다. 취소(N열 "취소") 행은 빼고 센다.
+ */
+export async function getSalonCounts(): Promise<Record<string, number>> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return {};
+
+  try {
+    const auth = getAuth();
+    const sheets = google.sheets({ version: "v4", auth });
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: "살롱!A:O",
+    });
+
+    const rows = (res.data.values as string[][] | null) ?? [];
+    const counts: Record<string, number> = {};
+
+    for (const row of rows) {
+      if (!row[0] || row[0] === "신청일시") continue;
+      if ((row[13] ?? "") === "취소") continue;
+      const program = row[4] ?? "";
+      if (!program) continue;
+      const key = countKey(program, row[5] ?? "");
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  } catch (e) {
+    console.error("[getSalonCounts]", e);
+    return {};
+  }
 }

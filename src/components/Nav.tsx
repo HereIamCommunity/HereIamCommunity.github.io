@@ -11,6 +11,7 @@ const menuItems: MenuItem[] = [
   { href: "/about",   kr: "코이노니아", en: "Story"   },
   { href: "/stay",    kr: "스테이",     en: "Stay"    },
   { href: "/salon",   kr: "살롱",       en: "Salon"   },
+  { href: "/talchum", kr: "탈춤축제",   en: "Festival", badge: "NEW" },
   { href: "/retreat", kr: "썸머캠프",   en: "Camp"    },
   { href: "/store",   kr: "스토어",     en: "Store"   },
   { href: "/andong",  kr: "안동 가이드", en: "Andong"  },
