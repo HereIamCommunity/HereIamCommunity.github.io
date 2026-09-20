@@ -238,6 +238,32 @@ export default function TalchumPage() {
           </p>
 
           <TalchumProgramGrid cards={CARDS} />
+
+          {/* ── 워크인 안내 ── */}
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-[#faf9f7] border border-[#e8e5df] rounded-2xl px-7 py-6">
+              <p className="text-[#296973] text-xs font-semibold tracking-wide uppercase mb-3">
+                신청 없이 오시면 되는 프로그램
+              </p>
+              <p className="text-[#372a14] text-sm leading-relaxed mb-1">
+                <span className="font-medium">탈꾸미기 &amp; 족자 쓰기 · 캐리커쳐 · 코이노니아 바 · 즉흥 댄스 공연</span>
+              </p>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                워크인으로 운영합니다. 편한 시간에 들러주세요.
+              </p>
+            </div>
+            <div className="bg-[#faf9f7] border border-[#e8e5df] rounded-2xl px-7 py-6">
+              <p className="text-[#ff6b35] text-xs font-semibold tracking-wide uppercase mb-3">
+                별도 신청폼으로 접수
+              </p>
+              <p className="text-[#372a14] text-sm leading-relaxed mb-1">
+                <span className="font-medium">청년인문교실 「안동인문행복트럭」</span>
+              </p>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                주최기관(문화체육관광부 · 한국정신문화재단) 신청폼으로 접수합니다.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
