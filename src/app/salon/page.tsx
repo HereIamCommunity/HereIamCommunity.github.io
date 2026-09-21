@@ -294,23 +294,8 @@ export default function SalonPage() {
         </div>
       </section>
 
-      {/* ── 결제 안내 배너 ── */}
-      <section className="py-10 px-6 md:px-16 bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-6 md:items-center md:justify-between">
-          <div>
-            <p className="text-[#ff6b35] text-xs tracking-[0.3em] uppercase mb-2 font-medium">Payment</p>
-            <p className="text-[#372a14] font-medium">계좌이체로 결제 · 카드결제 준비 중</p>
-            <p className="text-gray-400 text-sm mt-1">신청 즉시 참가가 확정됩니다. 별도 안내 없이 약속한 시간에 편히 방문해 주세요.</p>
-          </div>
-          <div className="text-sm text-gray-500 space-y-1">
-            <p>하나은행 <span className="font-semibold text-[#296973]">5539-10-13844507</span></p>
-            <p>예금주: 코이노니아</p>
-          </div>
-        </div>
-      </section>
-
       {/* ── 신청 폼 ── */}
-      <section id="booking" className="py-16 md:py-20 px-6 md:px-16 bg-[#faf9f7] scroll-mt-16">
+      <section id="booking" className="py-16 md:py-20 px-6 md:px-16 bg-white scroll-mt-16">
         <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-12">
           <div className="lg:col-span-2">
             <p className="text-[#ff6b35] text-xs tracking-[0.3em] uppercase mb-5 font-medium">How to Join · 참가 안내</p>
@@ -330,16 +315,23 @@ export default function SalonPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-8 pt-8 border-t border-gray-200">
-              <p className="text-xs text-gray-400 mb-2">문의</p>
-              <a
-                href="https://instagram.com/koinonia_andong"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-[#ff6b35] font-medium"
-              >
-                @koinonia_andong →
-              </a>
+            <div className="mt-8 pt-8 border-t border-gray-200 space-y-4">
+              <div>
+                <p className="text-xs text-gray-400 mb-1">계좌이체</p>
+                <p className="text-sm font-semibold text-[#296973]">하나은행 5539-10-13844507</p>
+                <p className="text-xs text-gray-400">예금주: 코이노니아</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-1">문의</p>
+                <a
+                  href="https://instagram.com/koinonia_andong"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-[#ff6b35] font-medium"
+                >
+                  @koinonia_andong →
+                </a>
+              </div>
             </div>
           </div>
           <div className="lg:col-span-3">
