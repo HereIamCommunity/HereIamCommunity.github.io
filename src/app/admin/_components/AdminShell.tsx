@@ -7,11 +7,12 @@ import Banner from "./Banner";
 import ListTab from "./ListTab";
 import OpenStayTab from "./OpenStayTab";
 import RetreatTab from "./RetreatTab";
+import MessagesTab from "./MessagesTab";
 import SettingsTab from "./SettingsTab";
 import StatsTab from "./StatsTab";
 import StayCalendarTab from "./StayCalendarTab";
 import ToastStack, { type ToastApi } from "./Toast";
-import TodayTab from "./TodayTab";
+import TodayTab, { type AirbnbEvent } from "./TodayTab";
 import type { ApiResult } from "./useAdminApi";
 import {
   amountText,
@@ -34,6 +35,7 @@ export const TABS = [
   { key: "stay", label: "스테이 캘린더" },
   { key: "retreat", label: "리트릿" },
   { key: "open", label: "무료개방" },
+  { key: "messages", label: "메시지" },
   { key: "settings", label: "설정" },
 ] as const;
 export type TabKey = (typeof TABS)[number]["key"];
@@ -186,6 +188,18 @@ export default function AdminShell({
   const stayRows = rows.filter((r) => r[1] === "스테이" && (r[13] ?? "").trim() !== "취소");
   const conflicts = findConflicts(stayRows, airbnbRanges, digest.today);
 
+  const airbnbCheckIns = useMemo<AirbnbEvent[]>(() => {
+    return Object.entries(airbnbRanges).flatMap(([room, ranges]) =>
+      ranges.filter((r) => r.start === digest.today).map((r) => ({ room, start: r.start, end: r.end }))
+    );
+  }, [airbnbRanges, digest.today]);
+
+  const airbnbCheckOuts = useMemo<AirbnbEvent[]>(() => {
+    return Object.entries(airbnbRanges).flatMap(([room, ranges]) =>
+      ranges.filter((r) => r.end === digest.today).map((r) => ({ room, start: r.start, end: r.end }))
+    );
+  }, [airbnbRanges, digest.today]);
+
   return (
     <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
       {topSlot && <div className="pt-6 md:pt-8">{topSlot}</div>}
@@ -311,6 +325,8 @@ export default function AdminShell({
           <TodayTab
             digest={digest}
             conflicts={conflicts}
+            airbnbCheckIns={airbnbCheckIns}
+            airbnbCheckOuts={airbnbCheckOuts}
             onGoCalendar={() => setTab("stay")}
             onGoPending={() => openList("입금대기")}
           />
@@ -336,6 +352,7 @@ export default function AdminShell({
           <RetreatTab retreats={retreats} counts={digest.retreatCounts} actions={actions} loading={loading} />
         )}
         {tab === "open" && <OpenStayTab openStays={openStays} actions={actions} loading={loading} />}
+        {tab === "messages" && <MessagesTab />}
         {tab === "settings" && <SettingsTab apiFetch={apiFetch} push={toasts.push} />}
       </div>
 
