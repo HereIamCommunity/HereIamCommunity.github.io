@@ -26,11 +26,11 @@ export default function Home() {
           <div className="flex flex-col gap-3 mt-16">
             {[
               { href: "/about",    label: "코이노니아",  en: "About"    },
-              { href: "/talchum", label: "탈춤축제",    en: "Festival", badge: "NEW" },
               { href: "/salon",   label: "살롱",        en: "Salon"    },
               { href: "/stay",    label: "스테이",      en: "Stay"     },
               { href: "/store",   label: "스토어",      en: "Store"    },
               { href: "/andong",  label: "안동 가이드", en: "Andong"   },
+              { href: "/talchum", label: "아카이브",    en: "Archive"  },
             ].map((item) => (
               <Link
                 key={item.href}
@@ -41,11 +41,6 @@ export default function Home() {
                   <span className="text-white/70 text-base font-light group-hover:text-white transition-colors">
                     {item.label}
                   </span>
-                  {"badge" in item && item.badge && (
-                    <span className="text-[9px] bg-[#ff6b35] text-white px-1.5 py-0.5 rounded font-bold tracking-wider">
-                      {item.badge}
-                    </span>
-                  )}
                 </span>
                 <span className="text-white/20 text-xs tracking-widest uppercase group-hover:text-[#ff6b35] transition-colors">
                   {item.en} →

@@ -5,24 +5,33 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 
-type MenuItem = { href: string; kr: string; en: string; badge?: string };
+type SubItem = { href: string; kr: string; en: string };
+type MenuItem =
+  | { href: string; kr: string; en: string; badge?: string; sub?: never }
+  | { href?: never; kr: string; en: string; badge?: string; sub: SubItem[] };
 
 const menuItems: MenuItem[] = [
   { href: "/about",   kr: "코이노니아", en: "Story"   },
   { href: "/stay",    kr: "스테이",     en: "Stay"    },
   { href: "/salon",   kr: "살롱",       en: "Salon"   },
-  { href: "/talchum", kr: "탈춤축제",   en: "Festival", badge: "NEW" },
-  { href: "/retreat", kr: "썸머캠프",   en: "Camp"    },
   { href: "/store",   kr: "스토어",     en: "Store"   },
   { href: "/andong",  kr: "안동 가이드", en: "Andong"  },
+  {
+    kr: "아카이브", en: "Archive",
+    sub: [
+      { href: "/talchum", kr: "탈춤축제", en: "Festival" },
+      { href: "/retreat",  kr: "썸머캠프", en: "Camp"     },
+    ],
+  },
 ];
 
 export default function Nav() {
-  const [open, setOpen]       = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const pathname              = usePathname();
-  const isHome                = pathname === "/";
-  const menuButtonRef         = useRef<HTMLButtonElement>(null);
+  const [open, setOpen]           = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [scrolled, setScrolled]   = useState(false);
+  const pathname                  = usePathname();
+  const isHome                    = pathname === "/";
+  const menuButtonRef             = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -111,30 +120,72 @@ export default function Nav() {
         <ul className="space-y-1 md:space-y-2 mb-14">
           {menuItems.map((item, i) => (
             <li
-              key={item.href}
+              key={item.kr}
               style={{
                 transform: open ? "translateY(0)" : "translateY(16px)",
                 opacity:   open ? 1 : 0,
                 transition: `transform 0.4s ease ${i * 55}ms, opacity 0.4s ease ${i * 55}ms`,
               }}
             >
-              <Link
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className="group flex items-baseline gap-5 py-2"
-              >
-                <span className="text-white/30 text-[10px] tracking-[0.2em] uppercase w-14 shrink-0 group-hover:text-white/60 transition-colors">
-                  {item.en}
-                </span>
-                <span className="text-white text-3xl md:text-5xl font-light tracking-tight group-hover:text-[#ff6b35] transition-colors duration-200">
-                  {item.kr}
-                </span>
-                {item.badge && (
-                  <span className="self-center text-[9px] bg-[#ff6b35] text-white px-1.5 py-0.5 rounded font-bold tracking-wider">
-                    {item.badge}
+              {item.sub ? (
+                /* 아카이브 — 하위메뉴 아코디언 */
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setArchiveOpen((v) => !v)}
+                    className="group flex items-baseline gap-5 py-2 w-full text-left"
+                  >
+                    <span className="text-white/30 text-[10px] tracking-[0.2em] uppercase w-14 shrink-0 group-hover:text-white/60 transition-colors">
+                      {item.en}
+                    </span>
+                    <span className="text-white text-3xl md:text-5xl font-light tracking-tight group-hover:text-[#ff6b35] transition-colors duration-200">
+                      {item.kr}
+                    </span>
+                    <span className={`self-center text-white/40 text-lg transition-transform duration-300 ${archiveOpen ? "rotate-45" : ""}`}>
+                      +
+                    </span>
+                  </button>
+                  {/* 하위 항목 */}
+                  <ul
+                    className={`overflow-hidden transition-all duration-300 ${archiveOpen ? "max-h-40 opacity-100" : "max-h-0 opacity-0"}`}
+                  >
+                    {item.sub.map((sub) => (
+                      <li key={sub.href}>
+                        <Link
+                          href={sub.href}
+                          onClick={() => { setOpen(false); setArchiveOpen(false); }}
+                          className="group flex items-baseline gap-5 py-1.5 pl-[4.75rem]"
+                        >
+                          <span className="text-white/25 text-[10px] tracking-[0.2em] uppercase w-14 shrink-0 group-hover:text-white/50 transition-colors">
+                            {sub.en}
+                          </span>
+                          <span className="text-white/70 text-xl md:text-2xl font-light tracking-tight group-hover:text-[#ff6b35] transition-colors duration-200">
+                            {sub.kr}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <Link
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className="group flex items-baseline gap-5 py-2"
+                >
+                  <span className="text-white/30 text-[10px] tracking-[0.2em] uppercase w-14 shrink-0 group-hover:text-white/60 transition-colors">
+                    {item.en}
                   </span>
-                )}
-              </Link>
+                  <span className="text-white text-3xl md:text-5xl font-light tracking-tight group-hover:text-[#ff6b35] transition-colors duration-200">
+                    {item.kr}
+                  </span>
+                  {item.badge && (
+                    <span className="self-center text-[9px] bg-[#ff6b35] text-white px-1.5 py-0.5 rounded font-bold tracking-wider">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              )}
             </li>
           ))}
         </ul>
