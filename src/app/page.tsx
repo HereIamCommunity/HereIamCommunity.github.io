@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import HeroNav from "@/components/HeroNav";
 export default function Home() {
   return (
     <div className="bg-[#faf9f7]">
@@ -23,31 +24,7 @@ export default function Home() {
           </div>
 
           {/* 하단 메뉴 링크 */}
-          <div className="flex flex-col gap-3 mt-16">
-            {[
-              { href: "/about",    label: "코이노니아",  en: "About"    },
-              { href: "/salon",   label: "살롱",        en: "Salon"    },
-              { href: "/stay",    label: "스테이",      en: "Stay"     },
-              { href: "/store",   label: "스토어",      en: "Store"    },
-              { href: "/andong",  label: "안동 가이드", en: "Andong"   },
-              { href: "/talchum", label: "아카이브",    en: "Archive"  },
-            ].map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="group flex items-center justify-between border-t border-white/10 pt-3 hover:border-[#ff6b35]/40 transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <span className="text-white/70 text-base font-light group-hover:text-white transition-colors">
-                    {item.label}
-                  </span>
-                </span>
-                <span className="text-white/20 text-xs tracking-widest uppercase group-hover:text-[#ff6b35] transition-colors">
-                  {item.en} →
-                </span>
-              </Link>
-            ))}
-          </div>
+          <HeroNav />
         </div>
 
         {/* 오른쪽: 사진 3장 세로 모자이크 */}
