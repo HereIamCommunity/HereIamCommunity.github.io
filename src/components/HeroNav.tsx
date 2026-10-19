@@ -12,6 +12,7 @@ const items: NavItem[] = [
   { href: "/salon",  label: "살롱",       en: "Salon"   },
   { href: "/stay",   label: "스테이",     en: "Stay"    },
   { href: "/store",  label: "스토어",     en: "Store"   },
+  { href: "/andong", label: "투어",       en: "Tour"    },
   {
     label: "아카이브", en: "Archive",
     sub: [
