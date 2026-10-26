@@ -10,8 +10,9 @@
  *   SOLAPI_API_SECRET    — Solapi 콘솔 > API Secret
  *   SOLAPI_SENDER_PHONE  — 발신번호 (Solapi에 등록한 번호, 하이픈 없이)
  *   KAKAO_PFID           — 카카오 채널 pfId
- *   KAKAO_TEMPLATE_STAY_REMINDER  — 7. [스테이] 체크인 전날 D-1 (선택)
- *   KAKAO_TEMPLATE_STAY_CHECKOUT  — 8. [스테이] 체크아웃 당일 (선택)
+ *   KAKAO_TEMPLATE_STAY_REMINDER   — 7. [스테이] 체크인 전날 D-1 (선택)
+ *   KAKAO_TEMPLATE_STAY_CHECKOUT   — 8. [스테이] 체크아웃 당일 (선택)
+ *   KAKAO_TEMPLATE_SALON_REMINDER  — 9. [살롱] 살롱 D-1 리마인더 (선택)
  *
  * 예약 상태 알림(접수·확정·취소)은 src/lib/messaging.ts 의 notifyBooking 이 담당한다.
  */
@@ -27,6 +28,10 @@ const TEXT_STAY_REMINDER =
 // 8. [스테이] 체크아웃 당일 (자동 발송) · KA01TP2609061500047704yNnPWcl2KG
 const TEXT_STAY_CHECKOUT =
   "안녕하세요, #{이름}님.\n기분 좋은 하루 시작하셨나요?\n\n코이노니아 체크아웃 메세지를 전해 드립니다.\n체크아웃은 오전 11시까지입니다.\n12시부터 클리닝 타임이 진행되니 체크아웃 시간을 지켜 주세요.\n\n▶ 스테이 경험 나누기\n편안한 여정이 되셨다면, 구글맵에 코이노니아 리뷰를 남겨 주세요.\n\n▶ 안동 기념품 선물 및 구매 (1층 스토어)\n안동의 물과 쌀을 빚어 만든 안동 소주, 일엽편주, 진맥소주, 진저 고유 등 우리 지역의 특산물을 소개하고 있습니다.\n\n▶ 러기지 서비스\n여행하는 동안 코이노니아에 짐을 맡기실 수 있습니다. (캐리어당 5천원)\n\n코이노니아 스테이에 머물러 주셔서 진심으로 감사합니다.\n안동에서 유쾌하고 행복한 시간 보내시길 바라요 😊\n\n문의: 010-2608-9144\n코이노니아 드림";
+
+// 9. [살롱] 살롱 D-1 리마인더 (자동 발송)
+const TEXT_SALON_REMINDER =
+  "안녕하세요, #{이름}님.\n내일 코이노니아 살롱 일정을 안내드립니다.\n\n■ 프로그램: #{프로그램명}\n■ 일시: #{일시}\n■ 장소: 코이노니아 (경북 안동시)\n\n당일 일정 변경이 필요하시면\n010-2608-9144 로\n미리 연락 부탁드립니다.\n\n내일 뵙겠습니다! 코이노니아 드림";
 
 function getClient() {
   return new SolapiMessageService(
@@ -98,6 +103,36 @@ export async function sendCheckoutSMS(guest: { name: string; phone: string }) {
     return;
   }
   await sendOne(guest.phone, buildCheckoutMessage(guest));
+}
+
+/* ─── 살롱 D-1 리마인더 ─────────────────────────── */
+export function buildSalonReminderMessage(guest: {
+  name: string;
+  program: string;
+  date: string;
+}): BuiltMessage {
+  const variables = {
+    "#{이름}": guest.name,
+    "#{프로그램명}": guest.program,
+    "#{일시}": guest.date,
+  };
+  return {
+    text: fill(TEXT_SALON_REMINDER, variables),
+    kakaoOptions: kakaoOptions(process.env.KAKAO_TEMPLATE_SALON_REMINDER, variables),
+  };
+}
+
+export async function sendSalonReminderSMS(guest: {
+  name: string;
+  phone: string;
+  program: string;
+  date: string;
+}) {
+  if (!hasSolapi()) {
+    console.warn("[SMS] 환경변수 미설정 — 살롱 D-1 리마인더 건너뜀");
+    return;
+  }
+  await sendOne(guest.phone, buildSalonReminderMessage(guest));
 }
 
 /* ─── 체크인 D-1 안내 ───────────────────────────── */
