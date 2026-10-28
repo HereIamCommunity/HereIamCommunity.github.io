@@ -34,6 +34,7 @@ function parseIcal(text: string): DateRange[] {
   events.shift();
 
   for (const event of events) {
+    if (/STATUS:CANCELLED/i.test(event)) continue;
     const startMatch = event.match(/DTSTART(?:;VALUE=DATE)?:(\d{8})/);
     const endMatch = event.match(/DTEND(?:;VALUE=DATE)?:(\d{8})/);
     if (!startMatch || !endMatch) continue;

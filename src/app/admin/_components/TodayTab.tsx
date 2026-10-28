@@ -123,11 +123,12 @@ export default function TodayTab({
         <Banner
           tone="ok"
           title="오늘 처리할 입금이 없어요"
-          detail={
-            digest.checkIns.length > 0
-              ? `오늘 체크인 ${digest.checkIns.length}건만 챙기면 돼요.`
-              : "오늘 들어오는 손님도 없어요. 여유 있는 하루예요."
-          }
+          detail={(() => {
+            const total = digest.checkIns.length + airbnbCheckIns.length;
+            return total > 0
+              ? `오늘 체크인 ${total}건만 챙기면 돼요.`
+              : "오늘 들어오는 손님도 없어요. 여유 있는 하루예요.";
+          })()}
         />
       )}
 
@@ -152,13 +153,13 @@ export default function TodayTab({
         />
         <SummaryCard
           label="오늘 체크인"
-          value={`${digest.checkIns.length}건`}
+          value={`${digest.checkIns.length + airbnbCheckIns.length}건`}
           tone="teal"
           onClick={() => scrollTo("today-checkin")}
         />
         <SummaryCard
           label="오늘 체크아웃"
-          value={`${digest.checkOuts.length}건`}
+          value={`${digest.checkOuts.length + airbnbCheckOuts.length}건`}
           tone="teal"
           onClick={() => scrollTo("today-checkout")}
         />
