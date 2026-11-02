@@ -51,6 +51,7 @@ export default function SalonBookingForm({
 }: Props) {
   const [step, setStep] = useState<Step>("select");
   const [selectedId, setSelectedId] = useState<string>("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [visitDate, setVisitDate] = useState<string>("");
   const [slot, setSlot] = useState<string>("");
   const [calendarDay, setCalendarDay] = useState<string>("");
@@ -117,6 +118,13 @@ export default function SalonBookingForm({
   const discountAmount = isMember && program ? program.price : 0;
   const totalAmount = program ? program.price - discountAmount : 0;
 
+  // list mode: multi-select 파생값
+  const selectedPrograms = mode === "list" ? programs.filter((p) => selectedIds.has(p.id)) : [];
+  const listSubtotal = selectedPrograms.reduce((sum, p) => sum + p.price, 0);
+  const listFinalAmount = isMember ? 0 : listSubtotal;
+  const activeFinalAmount = mode === "list" ? listFinalAmount : totalAmount;
+  const activeDiscountAmount = mode === "list" ? (isMember ? listSubtotal : 0) : discountAmount;
+
   const copyAccount = useCallback(() => {
     navigator.clipboard.writeText("5539-10-13844507");
     setCopied(true);
@@ -124,7 +132,9 @@ export default function SalonBookingForm({
   }, []);
 
   const handleNext = () => {
-    if (!selectedId) { setError("참가할 프로그램을 선택해주세요."); return; }
+    if (mode === "list" ? selectedIds.size === 0 : !selectedId) {
+      setError("참가할 프로그램을 선택해주세요."); return;
+    }
     setError("");
     setStep("info");
   };
@@ -141,14 +151,28 @@ export default function SalonBookingForm({
       const res = await fetch("/api/booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "salon",
-          program: program?.title,
-          date: bookingDate,
-          totalAmount,
-          discount,
-          ...form,
-        }),
+        body: JSON.stringify(
+          mode === "list"
+            ? {
+                type: "salon",
+                selections: selectedPrograms.map((p) => ({
+                  program: p.title,
+                  date: p.dateLabel,
+                  price: p.price,
+                })),
+                totalAmount: listFinalAmount,
+                discount,
+                ...form,
+              }
+            : {
+                type: "salon",
+                program: program?.title,
+                date: bookingDate,
+                totalAmount,
+                discount,
+                ...form,
+              }
+        ),
       });
       if (res.ok) {
         setStep("done");
@@ -207,14 +231,31 @@ export default function SalonBookingForm({
         <div className="bg-[#fffbde] rounded-xl p-5 mb-5 text-sm">
           <p className="font-bold text-[#372a14] mb-3">신청 내역</p>
           <div className="space-y-2 text-gray-600">
-            <div className="flex justify-between">
-              <span className="text-gray-400">프로그램</span>
-              <span className="font-medium text-[#372a14]">{program?.title}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">일시</span>
-              <span className="font-medium text-[#372a14]">{bookingDate}</span>
-            </div>
+            {mode === "list" ? (
+              selectedPrograms.map((p, idx) => (
+                <div key={p.id} className={idx > 0 ? "pt-2 border-t border-yellow-100" : ""}>
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-gray-400 shrink-0">프로그램</span>
+                    <span className="font-medium text-[#372a14] text-right text-xs leading-snug">{p.title}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">일시</span>
+                    <span className="font-medium text-[#372a14] text-sm">{p.dateLabel}</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">프로그램</span>
+                  <span className="font-medium text-[#372a14]">{program?.title}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">일시</span>
+                  <span className="font-medium text-[#372a14]">{bookingDate}</span>
+                </div>
+              </>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-400">신청자</span>
               <span className="font-medium text-[#372a14]">{form.name}</span>
@@ -222,12 +263,12 @@ export default function SalonBookingForm({
             {isMember && (
               <div className="flex justify-between text-[#296973]">
                 <span>멤버십 &#39;곁&#39; — 무료 참가</span>
-                <span>−{discountAmount.toLocaleString()}원</span>
+                <span>−{activeDiscountAmount.toLocaleString()}원</span>
               </div>
             )}
             <div className="flex justify-between font-bold text-[#ff6b35] text-base pt-2 border-t border-yellow-200 mt-1">
               <span>최종 입금액</span>
-              <span>{totalAmount === 0 ? "무료" : `${totalAmount.toLocaleString()}원`}</span>
+              <span>{activeFinalAmount === 0 ? "무료" : `${activeFinalAmount.toLocaleString()}원`}</span>
             </div>
           </div>
         </div>
@@ -296,12 +337,22 @@ export default function SalonBookingForm({
         </button>
 
         <h3 className="text-lg font-bold text-[#372a14] mb-1">참가 정보 입력</h3>
-        <p className="text-sm text-[#296973] font-medium mb-6">
-          {program?.dateLabel} · {program?.title}
-        </p>
+        {mode === "list" ? (
+          <div className="space-y-0.5 mb-6">
+            {selectedPrograms.map((p) => (
+              <p key={p.id} className="text-sm text-[#296973] font-medium leading-snug">
+                {p.dateLabel} · <span className="text-[#372a14]">{p.title}</span>
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-[#296973] font-medium mb-6">
+            {program?.dateLabel} · {program?.title}
+          </p>
+        )}
 
         {/* 상시 프로그램 — 방문 날짜 선택 */}
-        {program?.pickDate && (
+        {mode !== "list" && program?.pickDate && (
           <div className="mb-6">
             <label className="block text-sm font-medium text-[#372a14] mb-1">
               방문 날짜 <span className="text-red-400">*</span>
@@ -438,20 +489,43 @@ export default function SalonBookingForm({
 
         {/* 금액 요약 */}
         <div className="bg-[#fffbde] rounded-xl p-4 mb-5 text-sm">
-          <div className="flex justify-between text-gray-500 mb-1">
-            <span>{program?.title}</span>
-            <span>{program?.price.toLocaleString()}원</span>
-          </div>
-          {isMember && (
-            <div className="flex justify-between text-[#296973] mb-1">
-              <span>멤버십 &#39;곁&#39; — 무료 참가</span>
-              <span>−{discountAmount.toLocaleString()}원</span>
-            </div>
+          {mode === "list" ? (
+            <>
+              {selectedPrograms.map((p) => (
+                <div key={p.id} className="flex justify-between text-gray-500 mb-1">
+                  <span className="flex-1 pr-2 text-xs leading-snug">{p.title}</span>
+                  <span className="shrink-0">{p.price === 0 ? "무료" : `${p.price.toLocaleString()}원`}</span>
+                </div>
+              ))}
+              {isMember && (
+                <div className="flex justify-between text-[#296973] mb-1">
+                  <span>멤버십 &#39;곁&#39; — 무료 참가</span>
+                  <span>−{listSubtotal.toLocaleString()}원</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold pt-2 border-t border-yellow-200 mt-1">
+                <span>최종 참가비</span>
+                <span className="text-[#ff6b35]">{listFinalAmount === 0 ? "무료" : `${listFinalAmount.toLocaleString()}원`}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between text-gray-500 mb-1">
+                <span>{program?.title}</span>
+                <span>{program?.price.toLocaleString()}원</span>
+              </div>
+              {isMember && (
+                <div className="flex justify-between text-[#296973] mb-1">
+                  <span>멤버십 &#39;곁&#39; — 무료 참가</span>
+                  <span>−{discountAmount.toLocaleString()}원</span>
+                </div>
+              )}
+              <div className="flex justify-between font-bold pt-2 border-t border-yellow-200 mt-1">
+                <span>최종 참가비</span>
+                <span className="text-[#ff6b35]">{totalAmount === 0 ? "무료" : `${totalAmount.toLocaleString()}원`}</span>
+              </div>
+            </>
           )}
-          <div className="flex justify-between font-bold pt-2 border-t border-yellow-200 mt-1">
-            <span>최종 참가비</span>
-            <span className="text-[#ff6b35]">{totalAmount === 0 ? "무료" : `${totalAmount.toLocaleString()}원`}</span>
-          </div>
         </div>
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
@@ -489,19 +563,31 @@ export default function SalonBookingForm({
         key={p.id}
         className={`flex items-start gap-4 p-4 rounded-xl border-2 transition-all ${
           isDisabled ? "border-gray-100 bg-gray-50/50 opacity-60 cursor-not-allowed"
-          : selectedId === p.id ? "border-[#ff6b35] bg-[#ff6b35]/5 cursor-pointer"
+          : (mode === "list" ? selectedIds.has(p.id) : selectedId === p.id) ? "border-[#ff6b35] bg-[#ff6b35]/5 cursor-pointer"
           : "border-gray-100 hover:border-gray-200 bg-gray-50/50 cursor-pointer"
         }`}
       >
-        <input type="radio" name="program" value={p.id}
-          checked={selectedId === p.id} disabled={isDisabled}
-          onChange={() => {
-            setSelectedId(p.id);
-            setVisitDate(mode === "calendar" && p.pickDate ? calendarDay : "");
-            setSlot("");
-            setError("");
-          }}
-          className="accent-[#ff6b35] mt-1 shrink-0" />
+        {mode === "list" ? (
+          <input type="checkbox" value={p.id}
+            checked={selectedIds.has(p.id)} disabled={isDisabled}
+            onChange={() => {
+              const next = new Set(selectedIds);
+              if (next.has(p.id)) next.delete(p.id); else next.add(p.id);
+              setSelectedIds(next);
+              setError("");
+            }}
+            className="accent-[#ff6b35] mt-1 shrink-0" />
+        ) : (
+          <input type="radio" name="program" value={p.id}
+            checked={selectedId === p.id} disabled={isDisabled}
+            onChange={() => {
+              setSelectedId(p.id);
+              setVisitDate(mode === "calendar" && p.pickDate ? calendarDay : "");
+              setSlot("");
+              setError("");
+            }}
+            className="accent-[#ff6b35] mt-1 shrink-0" />
+        )}
         <div className="flex-1">
           <div className="flex items-center justify-between gap-2">
             <p className="font-medium text-[#372a14] text-sm">{p.title}</p>
@@ -664,6 +750,16 @@ export default function SalonBookingForm({
           </div>
           <div className="space-y-2 mb-7">
             {closed.map(renderCard)}
+          </div>
+        </div>
+      )}
+
+      {/* list mode: 선택 요약 */}
+      {mode === "list" && selectedIds.size > 0 && (
+        <div className="bg-[#fffbde] rounded-xl px-4 py-3 mb-4 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">{selectedIds.size}개 프로그램 선택됨</span>
+            <span className="font-bold text-[#ff6b35]">{listSubtotal.toLocaleString()}원</span>
           </div>
         </div>
       )}
