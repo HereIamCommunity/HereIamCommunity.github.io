@@ -6,6 +6,43 @@ export default function Home() {
   return (
     <div className="bg-[#faf9f7]">
       <PotluckPopup />
+
+      {/* ── 0. 11월 살롱 캘린더 배너 ── */}
+      <Link
+        href="/salon"
+        className="group flex flex-col sm:flex-row items-stretch bg-[#fffbde] border-b border-[#372a14]/10 hover:bg-[#fff8cc] transition-colors duration-300 overflow-hidden"
+      >
+        {/* 캘린더 이미지 */}
+        <div className="relative w-full sm:w-48 md:w-64 h-52 sm:h-auto shrink-0 overflow-hidden">
+          <Image
+            src="/images/salon/calendar-november.png"
+            alt="코이노니아 11월 살롱 캘린더"
+            width={1080}
+            height={1350}
+            className="w-full h-full object-cover object-top"
+            priority
+          />
+        </div>
+
+        {/* 텍스트 */}
+        <div className="flex flex-col justify-center px-7 md:px-12 py-7 md:py-10 gap-2">
+          <p className="text-[#ff6b35] text-[10px] tracking-[0.35em] uppercase font-semibold">
+            November 2026 · 살롱 프로그램
+          </p>
+          <h2 className="text-xl md:text-2xl font-light text-[#372a14] leading-snug">
+            11월 코이노니아 살롱<br />
+            <span className="text-[#296973] font-medium">일정이 열렸습니다.</span>
+          </h2>
+          <p className="text-[#372a14]/50 text-xs leading-relaxed">
+            화요 아뜰리에 · 수요 포틀럭 · 금요 나잇 · 아무튼 뜨개 살롱 · 오픈워십
+          </p>
+          <span className="mt-2 self-start inline-flex items-center gap-2 bg-[#372a14] text-white text-xs font-semibold px-5 py-2.5 rounded-full group-hover:bg-[#ff6b35] transition-colors duration-300">
+            살롱 신청하러 가기
+            <span className="group-hover:translate-x-1 transition-transform duration-300">→</span>
+          </span>
+        </div>
+      </Link>
+
       {/* ── 1. Hero: 타입 + 사진 분할 ── */}
       <section className="min-h-screen flex flex-col md:flex-row">
 
