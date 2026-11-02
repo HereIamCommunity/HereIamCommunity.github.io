@@ -98,7 +98,7 @@ export const PROGRAMS: Program[] = [
     date: "2026-11-10",
     dateLabel: "11월 10일 (화) 19:30",
     title: "화요 아뜰리에 Week 1 🎨",
-    subtitle: "스치는 길의 조화 · 마스킹 테이프, 수채화, 색연필, 오일파스텔, 펜으로 재료들의 조화가 어우러지는 예술 경험. 호스트: 성영 (Gloria)",
+    subtitle: "스치는 길의 조화 · 재료: 마스킹 테이프, 수채화, 색연필, 오일파스텔, 펜",
     price: 10000,
   },
   {
@@ -107,7 +107,7 @@ export const PROGRAMS: Program[] = [
     date: "2026-11-17",
     dateLabel: "11월 17일 (화) 19:30",
     title: "화요 아뜰리에 Week 2 🎨",
-    subtitle: "숨겨진 아티스트 (Stencil Street Art) · 스텐실 만들 종이, 문구용 칼, 고무판, 스프레이, 마스크. 스트리트 아트를 경험하는 시간. 호스트: 성영 (Gloria)",
+    subtitle: "숨겨진 아티스트 (Stencil Street Art) · 재료: 스텐실 종이, 문구용 칼, 고무판, 스프레이, 마스크",
     price: 10000,
   },
   {
@@ -116,7 +116,7 @@ export const PROGRAMS: Program[] = [
     date: "2026-11-24",
     dateLabel: "11월 24일 (화) 19:30",
     title: "화요 아뜰리에 Week 3 🎨",
-    subtitle: "우리 흔적을 모아모아 (Mixed Media Collage) · 잡지와 다양한 재료로 사진을 오리고 붙여 하나의 이미지로 만드는 콜라주. 호스트: 성영 (Gloria)",
+    subtitle: "우리 흔적을 모아모아 (Mixed Media Collage) · 재료: 잡지와 다양한 재료",
     price: 10000,
   },
   // 아무튼 뜨개 살롱
