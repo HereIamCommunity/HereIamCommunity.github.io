@@ -63,14 +63,16 @@ const specialDates = [
   {
     date: "11월 21일 (토) 15:00",
     title: "아무튼 뜨개 살롱 🧶",
+    price: "10,000원",
     image: "/images/salon/special-knitting-november.png",
-    desc: "날이 쌀쌀해졌으니 다시 실과 바늘을 꺼낼 때가 왔습니다. 한 코씩 천천히 뜨개를 하며 손을 움직이고 이야기를 나누는 오후. 호스트: 현정 (@sisol.made) · 참가비 10,000원",
+    desc: "날이 쌀쌀해졌으니 다시 실과 바늘을 꺼낼 때가 왔습니다. 한 코씩 천천히 뜨개를 하며 손을 움직이고 이야기를 나누는 오후. 호스트: 현정 (@sisol.made)",
   },
   {
     date: "11월 9일 · 23일 (월) 시간미정",
     title: "OPEN WORSHIP 🕯️",
+    price: "무료",
     image: "/images/salon/special-worship-november.png",
-    desc: "크리스천 주인장들이 은밀하게 드리던 월요 예배를 11월엔 격주로 오픈합니다. 신앙이 익숙한 사람도, 낯선 사람도 괜찮습니다. 부담 없이 찾아와 음악을 듣고 마음을 나누는 열린 자리. 참가비 무료",
+    desc: "크리스천 주인장들이 은밀하게 드리던 월요 예배를 11월엔 격주로 오픈합니다. 신앙이 익숙한 사람도, 낯선 사람도 괜찮습니다. 부담 없이 찾아와 음악을 듣고 마음을 나누는 열린 자리.",
   },
 ];
 
@@ -286,7 +288,10 @@ export default function SalonPage() {
                   className="w-full h-auto"
                 />
                 <div className="p-5">
-                  <p className="text-xs text-[#ff6b35] font-semibold tracking-wide mb-1">{item.date}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs text-[#ff6b35] font-semibold tracking-wide">{item.date}</p>
+                    <span className="text-xs text-gray-400">{item.price}</span>
+                  </div>
                   <p className="font-medium text-[#372a14] text-sm mb-1.5">{item.title}</p>
                   <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>
                 </div>
