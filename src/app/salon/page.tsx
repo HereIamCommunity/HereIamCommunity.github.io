@@ -236,20 +236,50 @@ export default function SalonPage() {
             <div>
               <p className="text-[#296973] text-xs tracking-[0.3em] uppercase mb-3 font-medium">Tuesday Atelier</p>
               <h2 className="text-3xl md:text-4xl font-light text-[#372a14] mb-4">화요 아뜰리에</h2>
-              <p className="text-gray-600 leading-relaxed mb-2">
-                다양한 재료로 나만의 작품을 만들어 보는 3주.
+              <p className="text-gray-600 leading-relaxed mb-1">
+                다양한 재료로 나만의 작품을 만들어 보는 3주. 호스트: 성영 (Gloria)
               </p>
-              <p className="text-gray-400 text-sm mb-6">매주 화요일 19:30 · 3주 연속 프로그램</p>
-              <div className="border-l-2 border-[#296973]/30 pl-5 py-1 mb-8">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs text-[#296973] font-semibold tracking-wide">11월 10일 · 17일 · 24일 (화) 19:30</p>
-                  <span className="text-xs text-gray-400">10,000원</span>
-                </div>
-                <p className="font-medium text-[#372a14] text-sm mb-1">스텐실, 콜라주, 텍스처 아트 🎨</p>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  스텐실, 콜라주부터 다양한 텍스처까지. 함께 그리고 붙이며 조화를 발견하는 시간.<br />
-                  호스트: 성영 (Gloria)
-                </p>
+              <p className="text-gray-400 text-xs mb-6">기본 재료는 호스트가 준비하며, 추가 준비물은 각 회차별 개별 공지</p>
+              <div className="space-y-4 mb-8">
+                {[
+                  {
+                    week: "Week 1",
+                    theme: "스치는 길의 조화",
+                    date: "11월 10일 (화) 19:30",
+                    materials: "마스킹 테이프, 수채화, 종이, 색연필, 오일파스텔, 펜",
+                    desc: "다양한 종류의 미술 재료를 자유롭게 그어서 그들의 조화가 어우러지는 과정을 통해 완성되는 예술 경험",
+                  },
+                  {
+                    week: "Week 2",
+                    theme: "숨겨진 아티스트",
+                    subtitle: "Stencil Street Art",
+                    date: "11월 17일 (화) 19:30",
+                    materials: "스텐실 만들 종이, 문구용 칼, 고무판, 스프레이, 마스크",
+                    desc: "그래피티, 스텐실, 포스터 등 다양한 기법을 사용하며 자유로운 표현과 사회적 메시지 전달이 특징인 스트리트 아트를 경험",
+                  },
+                  {
+                    week: "Week 3",
+                    theme: "우리 흔적을 모아모아",
+                    subtitle: "Mixed Media Collage",
+                    date: "11월 24일 (화) 19:30",
+                    materials: "잡지와 다양한 재료",
+                    desc: "사진을 오리고 붙이고, 그 위에 그림을 그리고, 페인트나 스프레이까지 더해 하나의 이미지로 만드는 혼합 매체 콜라주",
+                  },
+                ].map((item) => (
+                  <div key={item.week} className="border-l-2 border-[#296973]/30 pl-5 py-1">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <p className="text-xs text-[#296973] font-semibold tracking-wide">{item.date}</p>
+                      <span className="text-xs text-gray-400">10,000원</span>
+                    </div>
+                    <p className="font-medium text-[#372a14] text-sm">
+                      <span className="text-[10px] text-[#296973]/60 mr-1.5 font-normal">{item.week}</span>
+                      {item.theme}
+                      {item.subtitle && <span className="text-xs text-gray-400 font-normal ml-1">· {item.subtitle}</span>}
+                    </p>
+                    <p className="text-[10px] text-[#296973]/70 mt-0.5 mb-1">재료: {item.materials}</p>
+                    <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>
+                  </div>
+                ))}
               </div>
               <a
                 href="#booking"
