@@ -91,6 +91,44 @@ export const PROGRAMS: Program[] = [
     subtitle: "한국정신문화재단과 함께 안동의 종가문화와 종가음식을 알아보는 시간. 종가음식을 직접 맛보며 안동의 종가문화도 조금 더 가까이 만나봅니다.",
     price: 0,
   },
+  // 화요 아뜰리에
+  {
+    id: "s1110-atelier",
+    type: "special",
+    date: "2026-11-10",
+    dateLabel: "11월 10일 (화) 19:30",
+    title: "화요 아뜰리에 🎨",
+    subtitle: "스텐실, 콜라주부터 다양한 텍스처까지. 함께 그리고 붙이며 조화를 발견하는 시간. 호스트: 성영 (Gloria)",
+    price: 10000,
+  },
+  {
+    id: "s1117-atelier",
+    type: "special",
+    date: "2026-11-17",
+    dateLabel: "11월 17일 (화) 19:30",
+    title: "화요 아뜰리에 🎨",
+    subtitle: "스텐실, 콜라주부터 다양한 텍스처까지. 함께 그리고 붙이며 조화를 발견하는 시간. 호스트: 성영 (Gloria)",
+    price: 10000,
+  },
+  {
+    id: "s1124-atelier",
+    type: "special",
+    date: "2026-11-24",
+    dateLabel: "11월 24일 (화) 19:30",
+    title: "화요 아뜰리에 🎨",
+    subtitle: "스텐실, 콜라주부터 다양한 텍스처까지. 함께 그리고 붙이며 조화를 발견하는 시간. 호스트: 성영 (Gloria)",
+    price: 10000,
+  },
+  // 아무튼 뜨개 살롱
+  {
+    id: "s1121-knitting",
+    type: "special",
+    date: "2026-11-21",
+    dateLabel: "11월 21일 (토) 15:00",
+    title: "아무튼 뜨개 살롱 🧶",
+    subtitle: "한 코씩 천천히 뜨개를 하며 손을 움직이고 이야기를 나누는 오후. 호스트: 현정 (@sisol.made)",
+    price: 10000,
+  },
   // 프라이데이나잇
   {
     id: "f1106",
