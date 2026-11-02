@@ -260,8 +260,8 @@ export default function SalonPage() {
               <LightboxImage
                 src="/images/salon/atelier-november.png"
                 alt="화요 아뜰리에"
-                width={400}
-                height={500}
+                width={1080}
+                height={1350}
                 className="w-full max-w-sm h-auto rounded-2xl shadow-sm"
               />
             </div>
@@ -275,19 +275,19 @@ export default function SalonPage() {
           <p className="text-[#ff6b35] text-xs tracking-[0.3em] uppercase mb-3 font-medium">Someday Salons</p>
           <h2 className="text-3xl md:text-4xl font-light text-[#372a14] mb-2">그 외 스페셜</h2>
           <p className="text-gray-400 text-sm mb-10">토·월요일에 열리는 소규모 특별 모임</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {specialDates.map((item) => (
               <div key={item.date} className="bg-[#faf9f7] rounded-2xl overflow-hidden border border-gray-100">
                 <LightboxImage
                   src={item.image}
                   alt={item.title}
-                  width={400}
-                  height={300}
-                  className="w-full h-48 object-cover"
+                  width={1080}
+                  height={1350}
+                  className="w-full h-auto"
                 />
-                <div className="p-6">
-                  <p className="text-xs text-[#ff6b35] font-semibold tracking-wide mb-2">{item.date}</p>
-                  <p className="font-medium text-[#372a14] text-sm mb-2">{item.title}</p>
+                <div className="p-5">
+                  <p className="text-xs text-[#ff6b35] font-semibold tracking-wide mb-1">{item.date}</p>
+                  <p className="font-medium text-[#372a14] text-sm mb-1.5">{item.title}</p>
                   <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>
                 </div>
               </div>
