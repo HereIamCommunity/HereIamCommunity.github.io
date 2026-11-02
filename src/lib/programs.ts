@@ -97,8 +97,8 @@ export const PROGRAMS: Program[] = [
     type: "special",
     date: "2026-11-10",
     dateLabel: "11월 10일 (화) 19:30",
-    title: "화요 아뜰리에 Week 1 🎨",
-    subtitle: "스치는 길의 조화 · 재료: 마스킹 테이프, 수채화, 색연필, 오일파스텔, 펜",
+    title: "화요 아뜰리에 week.1 스치는 길의 조화 🎨",
+    subtitle: "재료: 마스킹 테이프, 수채화, 색연필, 오일파스텔, 펜",
     price: 10000,
   },
   {
@@ -106,8 +106,8 @@ export const PROGRAMS: Program[] = [
     type: "special",
     date: "2026-11-17",
     dateLabel: "11월 17일 (화) 19:30",
-    title: "화요 아뜰리에 Week 2 🎨",
-    subtitle: "숨겨진 아티스트 (Stencil Street Art) · 재료: 스텐실 종이, 문구용 칼, 고무판, 스프레이, 마스크",
+    title: "화요 아뜰리에 week.2 숨겨진 아티스트 🎨",
+    subtitle: "Stencil Street Art · 재료: 스텐실 종이, 문구용 칼, 고무판, 스프레이, 마스크",
     price: 10000,
   },
   {
@@ -115,8 +115,8 @@ export const PROGRAMS: Program[] = [
     type: "special",
     date: "2026-11-24",
     dateLabel: "11월 24일 (화) 19:30",
-    title: "화요 아뜰리에 Week 3 🎨",
-    subtitle: "우리 흔적을 모아모아 (Mixed Media Collage) · 재료: 잡지와 다양한 재료",
+    title: "화요 아뜰리에 week.3 우리 흔적을 모아모아 🎨",
+    subtitle: "Mixed Media Collage · 재료: 잡지와 다양한 재료",
     price: 10000,
   },
   // 아무튼 뜨개 살롱
