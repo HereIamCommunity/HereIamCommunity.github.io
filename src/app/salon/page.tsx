@@ -179,7 +179,7 @@ export default function SalonPage() {
                 한 주를 마무리하고 주말을 코이노니아에서 시작하는 금요일 밤.
               </p>
               <p className="text-white/40 text-sm mb-6">매주 금요일 20:00 시작</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <LightboxImage
                   src="/images/salon/friday-poster-1-november.png"
                   alt="프라이데이나잇 11월 1"
@@ -190,6 +190,13 @@ export default function SalonPage() {
                 <LightboxImage
                   src="/images/salon/friday-poster-2-november.png"
                   alt="프라이데이나잇 11월 2"
+                  width={200}
+                  height={260}
+                  className="w-full h-auto rounded-xl"
+                />
+                <LightboxImage
+                  src="/images/salon/friday-poster-3-november.png"
+                  alt="프라이데이나잇 11월 3"
                   width={200}
                   height={260}
                   className="w-full h-auto rounded-xl"
