@@ -61,18 +61,15 @@ const fridayDates = [
 
 const specialDates = [
   {
-    date: "11월 10일 · 17일 · 24일 (화) 19:30",
-    title: "화요 아뜰리에 🎨",
-    desc: "다양한 재료로 나만의 작품을 만들어 보는 3주. 스텐실, 콜라주부터 다양한 텍스처까지. 함께 그리고 붙이며 조화를 발견하는 시간. 호스트: 성영 (Gloria) · 참가비 10,000원",
-  },
-  {
     date: "11월 21일 (토) 15:00",
     title: "아무튼 뜨개 살롱 🧶",
+    image: "/images/salon/special-knitting-november.png",
     desc: "날이 쌀쌀해졌으니 다시 실과 바늘을 꺼낼 때가 왔습니다. 한 코씩 천천히 뜨개를 하며 손을 움직이고 이야기를 나누는 오후. 호스트: 현정 (@sisol.made) · 참가비 10,000원",
   },
   {
     date: "11월 9일 · 23일 (월) 시간미정",
     title: "OPEN WORSHIP 🕯️",
+    image: "/images/salon/special-worship-november.png",
     desc: "크리스천 주인장들이 은밀하게 드리던 월요 예배를 11월엔 격주로 오픈합니다. 신앙이 익숙한 사람도, 낯선 사람도 괜찮습니다. 부담 없이 찾아와 음악을 듣고 마음을 나누는 열린 자리. 참가비 무료",
   },
 ];
@@ -230,33 +227,71 @@ export default function SalonPage() {
         </div>
       </section>
 
-      {/* ── Someday Salons ── */}
+      {/* ── 화요 아뜰리에 ── */}
       <section className="py-16 md:py-20 px-6 md:px-16 bg-[#faf9f7]">
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
             <div>
-              <p className="text-[#ff6b35] text-xs tracking-[0.3em] uppercase mb-3 font-medium">Someday Salons</p>
-              <h2 className="text-3xl md:text-4xl font-light text-[#372a14] mb-2">그 외 스페셜</h2>
-              <p className="text-gray-400 text-sm mb-8">화·토·월요일에 열리는 소규모 특별 모임</p>
-              <div className="space-y-4">
-                {specialDates.map((item) => (
-                  <div key={item.date} className="bg-white rounded-2xl p-6 border border-gray-100">
-                    <p className="text-xs text-[#ff6b35] font-semibold tracking-wide mb-2">{item.date}</p>
-                    <p className="font-medium text-[#372a14] text-sm mb-2">{item.title}</p>
-                    <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>
-                  </div>
-                ))}
+              <p className="text-[#296973] text-xs tracking-[0.3em] uppercase mb-3 font-medium">Tuesday Atelier</p>
+              <h2 className="text-3xl md:text-4xl font-light text-[#372a14] mb-4">화요 아뜰리에</h2>
+              <p className="text-gray-600 leading-relaxed mb-2">
+                다양한 재료로 나만의 작품을 만들어 보는 3주.
+              </p>
+              <p className="text-gray-400 text-sm mb-6">매주 화요일 19:30 · 3주 연속 프로그램</p>
+              <div className="border-l-2 border-[#296973]/30 pl-5 py-1 mb-8">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-[#296973] font-semibold tracking-wide">11월 10일 · 17일 · 24일 (화) 19:30</p>
+                  <span className="text-xs text-gray-400">10,000원</span>
+                </div>
+                <p className="font-medium text-[#372a14] text-sm mb-1">스텐실, 콜라주, 텍스처 아트 🎨</p>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  스텐실, 콜라주부터 다양한 텍스처까지. 함께 그리고 붙이며 조화를 발견하는 시간.<br />
+                  호스트: 성영 (Gloria)
+                </p>
               </div>
+              <a
+                href="#booking"
+                className="inline-flex items-center gap-2 bg-[#296973] text-white text-sm font-semibold px-7 py-3 rounded-full hover:bg-[#1e5059] transition-colors"
+              >
+                화요 아뜰리에 신청 →
+              </a>
             </div>
             <div className="flex items-center justify-center">
               <LightboxImage
-                src="/images/salon/booking-method-november.png"
-                alt="신청 방법"
+                src="/images/salon/atelier-november.png"
+                alt="화요 아뜰리에"
                 width={400}
                 height={500}
                 className="w-full max-w-sm h-auto rounded-2xl shadow-sm"
               />
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Someday Salons ── */}
+      <section className="py-16 md:py-20 px-6 md:px-16 bg-white">
+        <div className="max-w-5xl mx-auto">
+          <p className="text-[#ff6b35] text-xs tracking-[0.3em] uppercase mb-3 font-medium">Someday Salons</p>
+          <h2 className="text-3xl md:text-4xl font-light text-[#372a14] mb-2">그 외 스페셜</h2>
+          <p className="text-gray-400 text-sm mb-10">토·월요일에 열리는 소규모 특별 모임</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {specialDates.map((item) => (
+              <div key={item.date} className="bg-[#faf9f7] rounded-2xl overflow-hidden border border-gray-100">
+                <LightboxImage
+                  src={item.image}
+                  alt={item.title}
+                  width={400}
+                  height={300}
+                  className="w-full h-48 object-cover"
+                />
+                <div className="p-6">
+                  <p className="text-xs text-[#ff6b35] font-semibold tracking-wide mb-2">{item.date}</p>
+                  <p className="font-medium text-[#372a14] text-sm mb-2">{item.title}</p>
+                  <p className="text-xs text-gray-500 leading-relaxed">{item.desc}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
