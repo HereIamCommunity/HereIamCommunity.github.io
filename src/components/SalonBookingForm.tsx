@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   type Program,
   type ProgramType,
@@ -62,6 +63,7 @@ export default function SalonBookingForm({
 
   const [copied, setCopied] = useState(false);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const router = useRouter();
 
   useEffect(() => {
     fetch("/api/program-counts")
@@ -193,6 +195,51 @@ export default function SalonBookingForm({
     } finally {
       setLoading(false);
     }
+  };
+
+  /** 카드 결제 — 토스페이먼츠 위젯으로 이동 */
+  const handleCardPay = () => {
+    if (!form.name || !form.phone) { setError("이름과 연락처를 입력해주세요."); return; }
+    if (program?.pickDate && !visitDate) { setError("방문하실 날짜를 선택해주세요."); return; }
+    if (program?.slots && !slot) { setError("방문하실 시간대를 선택해주세요."); return; }
+    if (remainingNow === 0) { setError("방금 마감되었습니다. 다른 날짜나 시간대를 선택해주세요."); return; }
+
+    const amount = activeFinalAmount;
+    if (amount <= 0) { setError("결제 금액이 0원입니다. 계좌이체로 신청해주세요."); return; }
+
+    const orderId = `koi${Date.now()}${Math.random().toString(36).slice(2, 7)}`;
+
+    const bookingPayload =
+      mode === "list"
+        ? {
+            type: "salon",
+            selections: selectedPrograms.map((p) => ({
+              program: p.title,
+              date: p.dateLabel,
+              price: p.price,
+            })),
+            totalAmount: amount,
+            discount,
+            ...form,
+          }
+        : {
+            type: "salon",
+            program: program?.title,
+            date: bookingDate,
+            totalAmount: amount,
+            discount,
+            ...form,
+          };
+
+    try {
+      sessionStorage.setItem(`koi_booking_${orderId}`, JSON.stringify(bookingPayload));
+    } catch {
+      // sessionStorage 없는 환경에서도 동작하도록
+    }
+
+    router.push(
+      `/payment?orderId=${orderId}&amount=${amount}&name=${encodeURIComponent(form.name)}&backTo=/salon`
+    );
   };
 
   /* ─────────── 완료 화면 ─────────── */
@@ -530,15 +577,34 @@ export default function SalonBookingForm({
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
+        {/* 카드결제 버튼: 토스페이먼츠 키가 설정된 경우에만 노출 */}
+        {activeFinalAmount > 0 && !!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY && (
+          <button
+            type="button"
+            onClick={handleCardPay}
+            disabled={loading}
+            className="w-full mb-3 bg-[#372a14] text-white font-semibold py-4 rounded-xl hover:bg-[#ff6b35] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            <span>💳</span>
+            카드 · 간편결제로 결제하기
+          </button>
+        )}
+
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-[#ff6b35] text-white font-semibold py-4 rounded-xl hover:bg-[#e55a25] transition-colors disabled:opacity-60"
+          className={`w-full font-semibold py-4 rounded-xl transition-colors disabled:opacity-60 ${
+            activeFinalAmount > 0 && !!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY
+              ? "bg-white text-[#372a14] border-2 border-[#372a14] hover:bg-[#372a14] hover:text-white"
+              : "bg-[#ff6b35] text-white hover:bg-[#e55a25]"
+          }`}
         >
-          {loading ? "처리 중..." : "신청 완료 → 계좌 정보 확인"}
+          {loading ? "처리 중..." : activeFinalAmount > 0 && !!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ? "계좌이체로 신청하기" : "신청 완료 → 계좌 정보 확인"}
         </button>
         <p className="text-xs text-gray-400 text-center mt-3">
-          신청 후 계좌이체로 참가비를 납부하면 확정됩니다.
+          {activeFinalAmount > 0
+            ? "계좌이체 신청 후 하나은행 5539-10-13844507 으로 입금하시면 확정됩니다."
+            : "신청 후 당일 편히 방문해 주세요."}
         </p>
       </form>
     );

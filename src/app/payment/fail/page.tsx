@@ -8,6 +8,7 @@ function FailContent() {
   const searchParams = useSearchParams();
   const code = searchParams.get("code") ?? "";
   const message = searchParams.get("message") ?? "결제가 취소되었습니다.";
+  const backTo = searchParams.get("backTo") ?? "/salon";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#faf9f7] px-6">
@@ -19,10 +20,10 @@ function FailContent() {
         {code && <p className="text-gray-300 text-xs mb-8">오류 코드: {code}</p>}
         <div className="flex flex-col gap-3">
           <Link
-            href="/stay"
+            href={backTo}
             className="bg-[#372a14] text-white py-3 rounded-full text-sm font-medium hover:bg-[#ff6b35] transition-colors"
           >
-            다시 예약하기
+            다시 시도하기
           </Link>
           <Link href="/" className="text-gray-400 text-sm hover:text-[#372a14] transition-colors">
             홈으로
