@@ -365,6 +365,15 @@ export default function SalonPage() {
                 </a>
               </div>
             </div>
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-xs text-gray-400 mb-3 tracking-wide">취소 · 환불 정책</p>
+              <div className="space-y-2 text-xs text-gray-500 leading-relaxed">
+                <p>• 프로그램 7일 전 취소 — 전액 환불</p>
+                <p>• 3–6일 전 취소 — 50% 환불</p>
+                <p>• 2일 이내 취소 — 환불 불가</p>
+                <p>• 카드 결제 취소는 결제 취소로 처리되며, 카드사 정책에 따라 환급 기간이 다를 수 있습니다.</p>
+              </div>
+            </div>
           </div>
           <div className="lg:col-span-3">
             <SalonBookingForm />

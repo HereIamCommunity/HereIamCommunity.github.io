@@ -98,7 +98,13 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-white/10 pt-6 flex flex-col sm:flex-row justify-between gap-2 text-xs text-white/30">
+        {/* 사업자 정보 — 토스페이먼츠 심사 필수 항목 */}
+        <div className="border-t border-white/10 pt-6 mb-4 text-xs text-white/40 leading-relaxed space-y-1">
+          <p>상호명: 코이노니아 &nbsp;|&nbsp; 대표자: 김예빈 &nbsp;|&nbsp; 사업자등록번호: 858-80-03112</p>
+          <p>통신판매업신고번호: 2025-경북안동-0208 &nbsp;|&nbsp; 사업장주소: 경상북도 안동시 중앙로 57</p>
+          <p>전화번호: 010-2608-9144 &nbsp;|&nbsp; 이메일: koinonia2025@naver.com</p>
+        </div>
+        <div className="flex flex-col sm:flex-row justify-between gap-2 text-xs text-white/30">
           <span>© 2025 koinonia. All rights reserved.</span>
           <span>경북 안동의 살롱 · 스테이 · 스토어</span>
         </div>
