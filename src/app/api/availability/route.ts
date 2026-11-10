@@ -40,8 +40,8 @@ function parseIcal(text: string): DateRange[] {
     if (!startMatch || !endMatch) continue;
 
     const start = formatDate(startMatch[1]);
-    // Airbnb DTEND는 exclusive — 하루 빼서 실제 마지막 날로
-    const end = subtractDay(formatDate(endMatch[1]));
+    // Airbnb DTEND = 실제 체크아웃일 (iCal exclusive — 그대로 사용)
+    const end = formatDate(endMatch[1]);
     ranges.push({ start, end });
   }
 
@@ -52,8 +52,3 @@ function formatDate(d: string): string {
   return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
 }
 
-function subtractDay(dateStr: string): string {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
