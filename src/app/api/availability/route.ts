@@ -16,7 +16,7 @@ export async function GET() {
     Object.entries(roomUrls).map(async ([room, url]) => {
       if (!url) { result[room] = []; return; }
       try {
-        const res = await fetch(url, { next: { revalidate: 3600 } });
+        const res = await fetch(url, { next: { revalidate: 300 } });
         const text = await res.text();
         result[room] = parseIcal(text);
       } catch {

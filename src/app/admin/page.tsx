@@ -223,14 +223,18 @@ export default function AdminPage() {
     };
   }, [fetchAll, applyResult]);
 
-  // 캘린더 + 오늘 탭 이중예약 배너용
-  useEffect(() => {
-    if (!authed) return;
+  const loadAvailability = useCallback(() => {
     fetch("/api/availability")
       .then((r) => r.json())
       .then((d) => setAirbnbRanges(d as Record<string, DateRange[]>))
       .catch(() => setAirbnbRanges({}));
-  }, [authed]);
+  }, []);
+
+  // 캘린더 + 오늘 탭 이중예약 배너용
+  useEffect(() => {
+    if (!authed) return;
+    loadAvailability();
+  }, [authed, loadAvailability]);
 
   const submitLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -357,7 +361,7 @@ export default function AdminPage() {
       apiFetch={apiFetch}
       loading={loading}
       error={error}
-      onRefresh={() => load(password)}
+      onRefresh={() => { void load(password); loadAvailability(); }}
       onLogout={logout}
       toasts={toasts}
     />

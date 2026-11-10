@@ -253,7 +253,7 @@ export function dayStatus(
     return dateStr >= inDate && dateStr < outDate;
   });
   const isAirbnb = (airbnbRanges[roomKey] ?? []).some(
-    (r) => dateStr >= normalizeDate(r.start) && dateStr <= normalizeDate(r.end)
+    (r) => dateStr >= normalizeDate(r.start) && dateStr < normalizeDate(r.end)
   );
   if (isWebsite && isAirbnb) return "both";
   if (isWebsite) return "website";
