@@ -171,10 +171,17 @@ export default function TodayTab({
         />
       </div>
 
-      <Section id="today-checkin" title="오늘 체크인" count={digest.checkIns.length} empty="오늘 들어오는 손님이 없어요.">
+      <Section id="today-checkin" title="오늘 체크인" count={digest.checkIns.length + airbnbCheckIns.length} empty="오늘 들어오는 손님이 없어요.">
         <ul className={CARD_FLUSH}>
           {digest.checkIns.map((row, i) => (
             <MiniRow key={`ci-${i}`} row={row} trailing={`${shortDate(row[8])} → ${shortDate(row[9])}`} />
+          ))}
+          {airbnbCheckIns.map((ev, i) => (
+            <li key={`aci-${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-gray-100 px-4 py-3 last:border-0">
+              <span className="text-sm font-medium text-brown">{ROOM_KO[ev.room] ?? ev.room}</span>
+              <span className="rounded bg-orange/10 px-1.5 py-0.5 text-xs text-brown">에어비앤비</span>
+              <span className="text-xs text-gray-700">{shortDate(ev.start)} → {shortDate(ev.end)}</span>
+            </li>
           ))}
         </ul>
       </Section>
@@ -182,12 +189,19 @@ export default function TodayTab({
       <Section
         id="today-checkout"
         title="오늘 체크아웃"
-        count={digest.checkOuts.length}
+        count={digest.checkOuts.length + airbnbCheckOuts.length}
         empty="오늘 나가는 손님이 없어요."
       >
         <ul className={CARD_FLUSH}>
           {digest.checkOuts.map((row, i) => (
             <MiniRow key={`co-${i}`} row={row} trailing={`${shortDate(row[8])} → ${shortDate(row[9])}`} />
+          ))}
+          {airbnbCheckOuts.map((ev, i) => (
+            <li key={`aco-${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-gray-100 px-4 py-3 last:border-0">
+              <span className="text-sm font-medium text-brown">{ROOM_KO[ev.room] ?? ev.room}</span>
+              <span className="rounded bg-orange/10 px-1.5 py-0.5 text-xs text-brown">에어비앤비</span>
+              <span className="text-xs text-gray-700">{shortDate(ev.start)} → {shortDate(ev.end)}</span>
+            </li>
           ))}
         </ul>
       </Section>
@@ -200,50 +214,6 @@ export default function TodayTab({
         </ul>
       </Section>
 
-      {/* 에어비앤비 iCal 체크인/체크아웃 — 웹사이트 예약과 별개로 표시 */}
-      {(airbnbCheckIns.length > 0 || airbnbCheckOuts.length > 0) && (
-        <>
-          <section aria-labelledby="today-airbnb-h" className="scroll-mt-56 md:scroll-mt-48">
-            <div className="mb-2 flex items-baseline gap-2">
-              <h2 id="today-airbnb-h" className={SECTION_H}>
-                에어비앤비 iCal
-              </h2>
-              <span className="rounded bg-orange/10 px-2 py-0.5 text-xs text-brown">외부 예약</span>
-            </div>
-            <p className="mb-3 text-xs leading-5 break-keep text-gray-700">
-              에어비앤비에서 직접 예약된 건이에요. 웹사이트 예약 시스템과 별개로 표시됩니다.
-            </p>
-
-            {airbnbCheckIns.length > 0 && (
-              <div className="mb-4 space-y-1">
-                <p className="px-1 text-xs font-medium text-gray-700">체크인 ({airbnbCheckIns.length}건)</p>
-                <ul className={CARD_FLUSH}>
-                  {airbnbCheckIns.map((ev, i) => (
-                    <li key={`aci-${i}`} className="flex items-center gap-3 border-b border-gray-100 px-4 py-3 last:border-0">
-                      <span className="text-sm font-medium text-brown">{ROOM_KO[ev.room] ?? ev.room}</span>
-                      <span className="text-xs text-gray-700">{shortDate(ev.start)} → {shortDate(ev.end)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {airbnbCheckOuts.length > 0 && (
-              <div className="space-y-1">
-                <p className="px-1 text-xs font-medium text-gray-700">체크아웃 ({airbnbCheckOuts.length}건)</p>
-                <ul className={CARD_FLUSH}>
-                  {airbnbCheckOuts.map((ev, i) => (
-                    <li key={`aco-${i}`} className="flex items-center gap-3 border-b border-gray-100 px-4 py-3 last:border-0">
-                      <span className="text-sm font-medium text-brown">{ROOM_KO[ev.room] ?? ev.room}</span>
-                      <span className="text-xs text-gray-700">{shortDate(ev.start)} → {shortDate(ev.end)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </section>
-        </>
-      )}
 
       <Section
         id="today-new"
