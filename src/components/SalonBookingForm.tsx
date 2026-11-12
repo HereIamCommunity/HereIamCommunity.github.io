@@ -613,7 +613,7 @@ export default function SalonBookingForm({
   /* ─────────── Step 1: 프로그램 선택 ─────────── */
   const isDisabledProgram = (p: Program) => {
     const remaining = getRemaining(p);
-    return (remaining !== null && remaining === 0) || isPastProgram(p);
+    return p.closed === true || (remaining !== null && remaining === 0) || isPastProgram(p);
   };
 
   const available = programs.filter((p) => !isDisabledProgram(p));

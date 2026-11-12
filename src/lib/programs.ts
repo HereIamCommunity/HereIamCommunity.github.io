@@ -24,6 +24,8 @@ export type Program = {
   pickDate?: boolean;
   /** 카드에 함께 띄울 준비물·비고 한 줄. */
   note?: string;
+  /** 운영자가 수동으로 신청 마감한 경우 */
+  closed?: boolean;
   /** 정원이 시간대 단위일 때(예: 30분마다 2명) 시간을 쪼개는 규칙. */
   slots?: SlotConfig;
 };
@@ -81,6 +83,7 @@ export const PROGRAMS: Program[] = [
     title: "종가음식 포틀럭",
     subtitle: "한국정신문화재단과 함께 안동의 종가문화와 종가음식을 알아보는 시간. 종가음식을 직접 맛보며 안동의 종가문화도 조금 더 가까이 만나봅니다.",
     price: 0,
+    capacity: 14,
   },
   {
     id: "p1125",
@@ -90,6 +93,7 @@ export const PROGRAMS: Program[] = [
     title: "종가음식 포틀럭",
     subtitle: "한국정신문화재단과 함께 안동의 종가문화와 종가음식을 알아보는 시간. 종가음식을 직접 맛보며 안동의 종가문화도 조금 더 가까이 만나봅니다.",
     price: 0,
+    capacity: 14,
   },
   {
     id: "p1202",
@@ -99,6 +103,7 @@ export const PROGRAMS: Program[] = [
     title: "종가음식 포틀럭",
     subtitle: "한국정신문화재단과 함께 안동의 종가문화와 종가음식을 알아보는 시간. 종가음식을 직접 맛보며 안동의 종가문화도 조금 더 가까이 만나봅니다.",
     price: 0,
+    capacity: 14,
   },
   {
     id: "p1209",
@@ -108,6 +113,7 @@ export const PROGRAMS: Program[] = [
     title: "종가음식 포틀럭",
     subtitle: "한국정신문화재단과 함께 안동의 종가문화와 종가음식을 알아보는 시간. 종가음식을 직접 맛보며 안동의 종가문화도 조금 더 가까이 만나봅니다.",
     price: 0,
+    capacity: 14,
   },
   {
     id: "p1216",
@@ -117,6 +123,7 @@ export const PROGRAMS: Program[] = [
     title: "종가음식 포틀럭",
     subtitle: "한국정신문화재단과 함께 안동의 종가문화와 종가음식을 알아보는 시간. 종가음식을 직접 맛보며 안동의 종가문화도 조금 더 가까이 만나봅니다.",
     price: 0,
+    capacity: 14,
   },
   // 화요 아뜰리에
   {
@@ -174,6 +181,7 @@ export const PROGRAMS: Program[] = [
     title: "보드게임 나잇: Murder Mystery 🔍",
     subtitle: "우리 중에 범인이 있다. 먹고 떠들고 의심하며 즐기는 머더미스터리 나잇.",
     price: 20000,
+    closed: true,
   },
   {
     id: "f1120",

@@ -757,6 +757,41 @@ export async function batchUpdateCells(data: { range: string; values: string[][]
 }
 
 /**
+ * 스테이 탭에서 취소되지 않은 객실별 예약을 반환.
+ * 서버사이드 중복 체크에 사용.
+ */
+export async function getActiveStayBookings(
+  room: string
+): Promise<{ checkIn: string; checkOut: string }[]> {
+  if (!SPREADSHEET_ID || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) return [];
+
+  try {
+    const auth = getAuth();
+    const sheets = google.sheets({ version: "v4", auth });
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: SPREADSHEET_ID,
+      range: "스테이!A:O",
+    });
+
+    const rows = (res.data.values as string[][] | null) ?? [];
+    const result: { checkIn: string; checkOut: string }[] = [];
+
+    for (const row of rows) {
+      if (!row[0] || row[0] === "신청일시") continue;
+      if ((row[13] ?? "") === "취소") continue;
+      if ((row[6] ?? "") !== room) continue;
+      const checkIn = row[8] ?? "";
+      const checkOut = row[9] ?? "";
+      if (checkIn && checkOut) result.push({ checkIn, checkOut });
+    }
+    return result;
+  } catch (e) {
+    console.error("[getActiveStayBookings]", e);
+    return [];
+  }
+}
+
+/**
  * 살롱 탭의 '프로그램 + 일시' 별 신청 인원.
  * 정원(`Program.capacity`)은 이 키 하나당 인원이라, 신청 폼의 잔여 표시와
  * 접수 API의 마감 확인이 같은 집계를 쓴다. 취소(N열 "취소") 행은 빼고 센다.
