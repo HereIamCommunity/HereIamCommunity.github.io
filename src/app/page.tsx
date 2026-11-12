@@ -43,6 +43,38 @@ export default function Home() {
         </div>
       </Link>
 
+      {/* ── 0-1. 종가음식 포틀럭 배너 ── */}
+      <Link
+        href="/salon"
+        className="group flex flex-col sm:flex-row items-stretch bg-[#2f1d3a] border-b border-white/5 hover:bg-[#3a2448] transition-colors duration-300 overflow-hidden"
+      >
+        <div className="relative w-full sm:w-48 md:w-64 h-52 sm:h-auto shrink-0 overflow-hidden">
+          <Image
+            src="/images/potluck/card-main.png"
+            alt="접빈객 : 환대의 식탁 — 종가음식 포틀럭"
+            width={1080}
+            height={1080}
+            className="w-full h-full object-cover object-top"
+          />
+        </div>
+        <div className="flex flex-col justify-center px-7 md:px-12 py-7 md:py-10 gap-2">
+          <p className="text-[#f5a623] text-[10px] tracking-[0.35em] uppercase font-semibold">
+            November – December 2026 · 종가음식 포틀럭
+          </p>
+          <h2 className="text-xl md:text-2xl font-light text-white leading-snug">
+            접빈객 : 환대의 식탁<br />
+            <span className="text-[#a3c96e] font-medium">우리 같이 종가음식 먹어요.</span>
+          </h2>
+          <p className="text-white/40 text-xs leading-relaxed">
+            11.18 – 12.16 · 매주 수요일 19:00–21:00 · 무료 · 저녁 식사 포함
+          </p>
+          <span className="mt-2 self-start inline-flex items-center gap-2 bg-[#f5a623] text-[#2f1d3a] text-xs font-semibold px-5 py-2.5 rounded-full group-hover:bg-[#a3c96e] transition-colors duration-300">
+            포틀럭 신청하러 가기
+            <span className="group-hover:translate-x-1 transition-transform duration-300">→</span>
+          </span>
+        </div>
+      </Link>
+
       {/* ── 1. Hero: 타입 + 사진 분할 ── */}
       <section className="min-h-screen flex flex-col md:flex-row">
 
