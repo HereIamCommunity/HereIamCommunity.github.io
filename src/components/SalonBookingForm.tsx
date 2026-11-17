@@ -26,7 +26,7 @@ export type ProgramGroup = {
 };
 
 export const SALON_GROUPS: ProgramGroup[] = [
-  { type: "potluck", label: "Wednesday Potluck", labelClass: "text-[#296973]", priceClass: "text-[#296973]", note: "종가 음식 포틀럭 1인당 1회 참석 가능" },
+  { type: "potluck", label: "Wednesday Potluck", labelClass: "text-[#296973]", priceClass: "text-[#296973]", note: "종가음식포틀럭은 1인당 최대 1회 참석 가능" },
   { type: "friday",  label: "Friday Night",      labelClass: "text-[#ff6b35]", priceClass: "text-[#ff6b35]" },
   { type: "special", label: "Someday Salons",    labelClass: "text-[#372a14]", priceClass: "text-[#372a14]" },
 ];
