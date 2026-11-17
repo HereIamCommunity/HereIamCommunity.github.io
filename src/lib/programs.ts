@@ -95,6 +95,7 @@ export const PROGRAMS: Program[] = [
     subtitle: "차 선생님과 함께 다식을 빚으며 함께 나누는 종가 식탁",
     price: 0,
     capacity: 14,
+    closed: true,
   },
   {
     id: "p1202",
