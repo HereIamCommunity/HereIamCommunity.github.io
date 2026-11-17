@@ -115,7 +115,7 @@ export const PROGRAMS: Program[] = [
     title: "종가음식 포틀럭 : 나와 지구를 돌보는 식탁",
     subtitle: "제철 식재료로 꾸미는 종가 식탁",
     price: 0,
-    capacity: 12,
+    capacity: 10,
   },
   {
     id: "p1216",
@@ -125,6 +125,7 @@ export const PROGRAMS: Program[] = [
     title: "종가음식 포틀럭 : 추억을 나누는 연말의 식탁",
     price: 0,
     capacity: 12,
+    closed: true,
   },
   // 화요 아뜰리에
   {
