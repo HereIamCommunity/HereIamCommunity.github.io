@@ -22,10 +22,11 @@ export type ProgramGroup = {
   label: string;
   labelClass: string;
   priceClass: string;
+  note?: string;
 };
 
 export const SALON_GROUPS: ProgramGroup[] = [
-  { type: "potluck", label: "Wednesday Potluck", labelClass: "text-[#296973]", priceClass: "text-[#296973]" },
+  { type: "potluck", label: "Wednesday Potluck", labelClass: "text-[#296973]", priceClass: "text-[#296973]", note: "1인당 최대 2회 참석 가능" },
   { type: "friday",  label: "Friday Night",      labelClass: "text-[#ff6b35]", priceClass: "text-[#ff6b35]" },
   { type: "special", label: "Someday Salons",    labelClass: "text-[#372a14]", priceClass: "text-[#372a14]" },
 ];
@@ -802,6 +803,9 @@ export default function SalonBookingForm({
             <div className="space-y-2">
               {inGroup.map(renderCard)}
             </div>
+            {g.note && (
+              <p className="text-xs text-gray-400 mt-2 pl-1">{g.note}</p>
+            )}
           </div>
         );
       })}
