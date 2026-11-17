@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appendBooking, getSalonCounts, getActiveStayBookings } from "@/lib/sheets";
-import { isBookingFull } from "@/lib/programs";
+import { isBookingFull, PROGRAMS } from "@/lib/programs";
 import { notifyBooking } from "@/lib/messaging";
 import { sendOperatorAlert, sendGuestConfirmation } from "@/lib/email";
 
@@ -11,8 +11,30 @@ export async function POST(req: NextRequest) {
 
     console.log("[BOOKING]", createdAt, JSON.stringify(data, null, 2));
 
-    // ── 0. 정원이 있으면 마감을 서버에서 다시 확인 ──────────────
+    // ── 0. 살롱: 마감·날짜 서버 검증 ────────────────────────────
     if (data.type === "salon") {
+      const today = new Date().toISOString().slice(0, 10);
+      const titlesToCheck: string[] = Array.isArray(data.selections) && data.selections.length > 0
+        ? (data.selections as { program: string }[]).map((s) => s.program)
+        : [data.program];
+
+      for (const title of titlesToCheck) {
+        const prog = PROGRAMS.find((p) => p.title === title);
+        if (!prog) continue;
+        if (prog.closed) {
+          return NextResponse.json(
+            { success: false, message: `'${title}' 신청이 마감되었습니다.` },
+            { status: 409 }
+          );
+        }
+        if (prog.date < today) {
+          return NextResponse.json(
+            { success: false, message: `'${title}' 은(는) 이미 지난 프로그램입니다.` },
+            { status: 409 }
+          );
+        }
+      }
+
       const counts = await getSalonCounts();
 
       if (Array.isArray(data.selections) && data.selections.length > 0) {
