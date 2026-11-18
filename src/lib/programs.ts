@@ -105,7 +105,7 @@ export const PROGRAMS: Program[] = [
     title: "종가음식 포틀럭 : 배우고 어울리며 차리는 한 상",
     subtitle: "종가 레시피를 배우며 직접 만드는 종가 식탁",
     price: 0,
-    capacity: 14,
+    capacity: 7,
   },
   {
     id: "p1209",
@@ -115,7 +115,7 @@ export const PROGRAMS: Program[] = [
     title: "종가음식 포틀럭 : 나와 지구를 돌보는 식탁",
     subtitle: "제철 식재료로 꾸미는 종가 식탁",
     price: 0,
-    capacity: 10,
+    capacity: 5,
   },
   {
     id: "p1216",
