@@ -83,8 +83,7 @@ export const PROGRAMS: Program[] = [
     title: "종가음식 포틀럭 : 안동의 식탁",
     subtitle: "농암종택의 종부님을 모시고 접빈객 문화를 배우는 식탁",
     price: 0,
-    capacity: 14,
-    closed: true,
+    capacity: 4,
   },
   {
     id: "p1125",
