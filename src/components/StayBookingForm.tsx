@@ -10,7 +10,7 @@ function isOverlapping(checkIn: string, checkOut: string, ranges: DateRange[]): 
   return ranges.some(({ start, end }) => {
     const s = new Date(start);
     const e = new Date(end);
-    return ci <= e && co > s;
+    return ci < e && co > s;
   });
 }
 
