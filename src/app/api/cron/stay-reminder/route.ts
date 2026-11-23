@@ -41,7 +41,9 @@ export async function GET(req: NextRequest) {
     const status = row[13] ?? "";
     if (status === "취소") continue;
 
-    const checkIn = (row[8] ?? "").trim().replace(/\.\s*/g, "-").replace(/-$/, "");
+    const rawCheckIn = (row[8] ?? "").trim();
+    const m = rawCheckIn.match(/(\d{4})[.\-]?\s*(\d{1,2})[.\-]?\s*(\d{1,2})/);
+    const checkIn = m ? `${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}` : rawCheckIn;
     if (checkIn !== tomorrow) continue;
 
     const name = row[2] ?? "";
