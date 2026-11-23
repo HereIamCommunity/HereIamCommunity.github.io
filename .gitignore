@@ -26,7 +26,6 @@ next-env.d.ts
 .DS_Store
 
 # Claude internal files
-CLAUDE.md
 AGENTS.md
 .claude/
 .env*
