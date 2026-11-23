@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     const status = row[13] ?? "";
     if (status === "취소") continue;
 
-    const checkIn = (row[8] ?? "").trim();
+    const checkIn = (row[8] ?? "").trim().replace(/\.\s*/g, "-").replace(/-$/, "");
     if (checkIn !== tomorrow) continue;
 
     const name = row[2] ?? "";
