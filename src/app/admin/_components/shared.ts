@@ -246,19 +246,33 @@ export function dayStatus(
   roomKey: string
 ): DayStatus {
   const roomName = ROOM_NAMES[roomKey];
-  const isWebsite = stayRows.some((r) => {
+
+  // 웹사이트 예약 (해당 날짜 포함)
+  const webBookings = stayRows.filter((r) => {
     if (r[6] !== roomName || !r[8] || !r[9]) return false;
-    const inDate = normalizeDate(r[8]);
-    const outDate = normalizeDate(r[9]);
-    return dateStr >= inDate && dateStr < outDate;
+    return dateStr >= normalizeDate(r[8]) && dateStr < normalizeDate(r[9]);
   });
-  const isAirbnb = (airbnbRanges[roomKey] ?? []).some(
+  const isWebsite = webBookings.length > 0;
+
+  // 에어비앤비 블록 (해당 날짜 포함)
+  const airbnbBlocks = (airbnbRanges[roomKey] ?? []).filter(
     (r) => dateStr >= normalizeDate(r.start) && dateStr < normalizeDate(r.end)
   );
-  if (isWebsite && isAirbnb) return "both";
-  if (isWebsite) return "website";
-  if (isAirbnb) return "airbnb";
-  return "available";
+
+  if (airbnbBlocks.length === 0) {
+    return isWebsite ? "website" : "available";
+  }
+
+  // 에어비앤비 블록이 웹사이트 예약의 역반영인지 확인
+  // (Airbnb이 우리 iCal을 싱크하면서 만든 "Not available" 블록)
+  // 같은 방·같은 체크인일에 웹사이트 예약이 있으면 반영된 것으로 간주
+  const isReflection = airbnbBlocks.every((ab) =>
+    webBookings.some((wb) => normalizeDate(ab.start) === normalizeDate(wb[8]))
+  );
+
+  if (isWebsite && isReflection) return "website";
+  if (isWebsite) return "both";
+  return "airbnb";
 }
 
 /** 오늘부터 N일 안에 웹사이트·에어비앤비가 겹치는 날 (이중예약 경고용) */

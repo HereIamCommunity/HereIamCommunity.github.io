@@ -40,19 +40,12 @@ export async function GET(
 
     if (!checkIn || !checkOut) return "";
 
-    // checkOut은 iCal exclusive (체크아웃 날 +1일)
-    const checkOutDate = new Date(row[9] + "T00:00:00");
-    checkOutDate.setDate(checkOutDate.getDate() + 1);
-    const checkOutExclusive = [
-      checkOutDate.getFullYear(),
-      String(checkOutDate.getMonth() + 1).padStart(2, "0"),
-      String(checkOutDate.getDate()).padStart(2, "0"),
-    ].join("");
-
+    // iCal all-day event에서 DTEND는 exclusive end.
+    // 체크아웃일 자체가 exclusive end이므로 그대로 사용 (Airbnb 관례와 동일)
     return [
       "BEGIN:VEVENT",
       `DTSTART;VALUE=DATE:${checkIn}`,
-      `DTEND;VALUE=DATE:${checkOutExclusive}`,
+      `DTEND;VALUE=DATE:${checkOut}`,
       "SUMMARY:Koinonia Stay - Reserved",
       `UID:${uid}`,
       `DTSTAMP:${now}`,
