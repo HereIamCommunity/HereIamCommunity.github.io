@@ -28,6 +28,7 @@ type Step = "form" | "done";
 export default function StayBookingForm() {
   const [step, setStep] = useState<Step>("form");
   const [selected, setSelected] = useState("");
+  const [payMethod, setPayMethod] = useState<"card" | "transfer">("card");
   const [form, setForm] = useState({
     name: "", phone: "", email: "",
     checkIn: "", checkOut: "",
@@ -79,6 +80,39 @@ export default function StayBookingForm() {
     }
     setError("");
     setLoading(true);
+
+    if (payMethod === "card") {
+      const orderId = `stay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const bookingData = {
+        type: "stay",
+        room: room?.name,
+        nights,
+        name: form.name,
+        phone: form.phone,
+        email: form.email,
+        checkIn: form.checkIn,
+        checkOut: form.checkOut,
+        discount: form.discount,
+        totalAmount,
+        memo: form.memo,
+      };
+      try {
+        sessionStorage.setItem(`koi_booking_${orderId}`, JSON.stringify(bookingData));
+      } catch {
+        // sessionStorage 없는 환경 무시
+      }
+      const params = new URLSearchParams({
+        orderId,
+        amount: String(totalAmount),
+        name: form.name,
+        orderName: `코이노니아 스테이 (${room?.name})`,
+        backTo: "/stay",
+      });
+      window.location.href = `/payment?${params.toString()}`;
+      return;
+    }
+
+    // 계좌이체
     try {
       const res = await fetch("/api/booking", {
         method: "POST",
@@ -109,28 +143,14 @@ export default function StayBookingForm() {
     }
   };
 
-  /* ── 완료 화면 ── */
+  /* ── 완료 화면 (계좌이체) ── */
   if (step === "done") {
-    const isMember = form.discount === "geot";
     return (
       <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
         <div className="text-center mb-6">
           <div className="text-4xl mb-4">🏠</div>
-          <h3 className="text-xl font-bold text-[#372a14] mb-2">예약 확정!</h3>
-          <p className="text-gray-500 text-sm leading-relaxed">
-            코이노니아에서 기다리고 있을게요.
-          </p>
-        </div>
-
-        <div className="bg-[#296973]/10 border border-[#296973]/20 rounded-xl px-5 py-4 mb-6">
-          <p className="text-sm font-semibold text-[#296973] mb-1">
-            {isMember ? "멤버십 '곁' — 20% 할인 적용" : "신청 즉시 예약이 확정됩니다"}
-          </p>
-          <p className="text-sm text-[#296973]/80 leading-relaxed">
-            {isMember
-              ? "아래 계좌로 할인 금액을 입금해주세요."
-              : "코이노니아 스테이는 별도 안내 메시지를 드리지 않습니다.\n약속한 날에 편히 방문해 주세요."}
-          </p>
+          <h3 className="text-xl font-bold text-[#372a14] mb-2">예약 신청 완료!</h3>
+          <p className="text-gray-500 text-sm leading-relaxed">아래 계좌로 입금하시면 예약이 확정됩니다.</p>
         </div>
 
         <div className="bg-[#fffbde] rounded-xl p-5 mb-5 text-sm">
@@ -199,15 +219,6 @@ export default function StayBookingForm() {
         <p className="text-xs text-gray-400 text-center">
           문의: <a href="https://instagram.com/koinonia_andong" target="_blank" rel="noopener noreferrer" className="text-[#ff6b35]">@koinonia_andong</a>
         </p>
-
-        <div className="mt-6 pt-5 border-t border-gray-100 text-center">
-          <a
-            href="/booking-check"
-            className="text-sm text-[#296973] hover:underline"
-          >
-            나중에 예약 내역 다시 확인하기 →
-          </a>
-        </div>
       </div>
     );
   }
@@ -373,21 +384,6 @@ export default function StayBookingForm() {
         </select>
       </div>
 
-      {/* 현금영수증 */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-[#372a14] mb-1">
-          현금영수증 번호 <span className="text-gray-400 font-normal">(선택)</span>
-        </label>
-        <input
-          type="text"
-          value={form.cashReceipt}
-          onChange={(e) => setForm({ ...form, cashReceipt: e.target.value })}
-          placeholder="010-0000-0000 또는 사업자번호"
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#ff6b35]"
-        />
-        <p className="text-xs text-gray-400 mt-1">번호를 남겨주시면 입금 확인 후 발행해드립니다.</p>
-      </div>
-
       {/* 요청사항 */}
       <div className="mb-6">
         <label className="block text-sm font-medium text-[#372a14] mb-1">
@@ -422,6 +418,42 @@ export default function StayBookingForm() {
         </div>
       )}
 
+      {/* 결제 수단 선택 */}
+      <div className="mb-5">
+        <p className="text-sm font-medium text-[#372a14] mb-2">결제 수단</p>
+        <div className="grid grid-cols-2 gap-2">
+          {(["card", "transfer"] as const).map((method) => (
+            <button
+              key={method}
+              type="button"
+              onClick={() => setPayMethod(method)}
+              className={`py-3 rounded-xl border-2 text-sm font-medium transition-colors ${
+                payMethod === method
+                  ? "border-[#ff6b35] bg-[#ff6b35]/5 text-[#ff6b35]"
+                  : "border-gray-200 text-gray-500 hover:border-gray-300"
+              }`}
+            >
+              {method === "card" ? "💳 카드 · 간편결제" : "🏦 계좌이체"}
+            </button>
+          ))}
+        </div>
+        {payMethod === "transfer" && (
+          <div className="mt-3">
+            <label className="block text-sm font-medium text-[#372a14] mb-1">
+              현금영수증 번호 <span className="text-gray-400 font-normal">(선택)</span>
+            </label>
+            <input
+              type="text"
+              value={form.cashReceipt}
+              onChange={(e) => setForm({ ...form, cashReceipt: e.target.value })}
+              placeholder="010-0000-0000 또는 사업자번호"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#ff6b35]"
+            />
+            <p className="text-xs text-gray-400 mt-1">번호를 남겨주시면 입금 확인 후 발행해드립니다.</p>
+          </div>
+        )}
+      </div>
+
       {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
       <button
@@ -429,10 +461,14 @@ export default function StayBookingForm() {
         disabled={loading || !selected || nights <= 0 || dateConflict}
         className="w-full bg-[#ff6b35] text-white font-semibold py-4 rounded-xl hover:bg-[#e55a25] transition-colors disabled:opacity-50"
       >
-        {loading ? "처리 중..." : "예약 신청 완료 → 계좌 정보 확인"}
+        {loading
+          ? (payMethod === "card" ? "결제 페이지로 이동 중..." : "처리 중...")
+          : payMethod === "card"
+            ? `${totalAmount > 0 ? totalAmount.toLocaleString() + "원 " : ""}카드로 결제하기`
+            : "예약 신청 완료 → 계좌 정보 확인"}
       </button>
       <p className="text-xs text-gray-400 text-center mt-3">
-        신청 후 계좌이체로 입금하시면 예약이 확정됩니다.
+        {payMethod === "card" ? "카드 · 간편결제 지원 · 토스페이먼츠 보안 결제" : "신청 후 계좌이체로 입금하시면 예약이 확정됩니다."}
       </p>
     </form>
   );

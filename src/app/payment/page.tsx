@@ -13,6 +13,7 @@ function PaymentContent() {
   const amount = Number(searchParams.get("amount") ?? 0);
   const customerName = searchParams.get("name") ?? "";
   const backTo = searchParams.get("backTo") ?? "/salon";
+  const orderName = searchParams.get("orderName") ?? "코이노니아 예약";
 
   const widgetsRef = useRef<TossPaymentsWidgets | null>(null);
   const [ready, setReady] = useState(false);
@@ -46,7 +47,7 @@ function PaymentContent() {
     try {
       await widgetsRef.current.requestPayment({
         orderId,
-        orderName: "코이노니아 살롱 참가비",
+        orderName,
         customerName,
         successUrl: `${window.location.origin}/payment/success?backTo=${encodeURIComponent(backTo)}`,
         failUrl: `${window.location.origin}/payment/fail?backTo=${encodeURIComponent(backTo)}`,
