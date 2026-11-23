@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-type DateRange = { start: string; end: string };
+type DateRange = { start: string; end: string; summary?: string };
 
 /** 방별 Airbnb iCal을 파싱해서 블록된 날짜 범위 반환 */
 export async function GET() {
@@ -42,7 +42,9 @@ function parseIcal(text: string): DateRange[] {
     const start = formatDate(startMatch[1]);
     // Airbnb DTEND = 실제 체크아웃일 (iCal exclusive — 그대로 사용)
     const end = formatDate(endMatch[1]);
-    ranges.push({ start, end });
+    const summaryMatch = event.match(/SUMMARY:(.+)/);
+    const summary = summaryMatch ? summaryMatch[1].trim() : undefined;
+    ranges.push({ start, end, summary });
   }
 
   return ranges;

@@ -235,7 +235,7 @@ export const STICKY_L = "sticky left-0 z-10";
 export const STICKY_R = "sticky right-0 z-10";
 
 /* ── 스테이 캘린더 계산 (문자열 비교 전에 normalizeDate로 통일) ── */
-export type DateRange = { start: string; end: string };
+export type DateRange = { start: string; end: string; summary?: string };
 export type DayStatus = "website" | "airbnb" | "both" | "available";
 
 /** 체크인 ≤ d < 체크아웃 이면 그 방은 그 날 웹사이트 예약으로 찬 것 */

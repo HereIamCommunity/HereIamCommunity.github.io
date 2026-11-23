@@ -193,15 +193,23 @@ export default function StayCalendarTab({
                   </div>
                 </li>
               ))}
-              {upcomingAirbnb.map((r, i) => (
-                <li key={`a-${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg bg-orange/5 px-3 py-2.5">
-                  <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-orange" />
-                  <span className="whitespace-nowrap text-sm font-medium text-brown">에어비앤비</span>
-                  <span className="whitespace-nowrap text-xs text-gray-700">
-                    {shortDate(normalizeDate(r.start))} → {shortDate(normalizeDate(r.end))}
-                  </span>
-                </li>
-              ))}
+              {upcomingAirbnb.map((r, i) => {
+                const nameMatch = r.summary?.match(/\((.+)\)/);
+                const guestName = nameMatch ? nameMatch[1] : null;
+                return (
+                  <li key={`a-${i}`} className="rounded-lg bg-orange/5 px-3 py-2.5">
+                    <div className="flex items-center gap-2">
+                      <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-orange" />
+                      <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-brown">
+                        {guestName ?? "에어비앤비"}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 pl-4 text-xs text-gray-700">
+                      {shortDate(normalizeDate(r.start))} → {shortDate(normalizeDate(r.end))}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
