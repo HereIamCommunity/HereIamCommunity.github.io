@@ -3,6 +3,7 @@ import { appendBooking, getSalonCounts, getActiveStayBookings } from "@/lib/shee
 import { isBookingFull, PROGRAMS } from "@/lib/programs";
 import { notifyBooking } from "@/lib/messaging";
 import { sendOperatorAlert, sendGuestConfirmation } from "@/lib/email";
+import { normalizeDate } from "@/lib/digest";
 
 export async function POST(req: NextRequest) {
   try {
@@ -61,9 +62,11 @@ export async function POST(req: NextRequest) {
 
     if (data.type === "stay" && data.room && data.checkIn && data.checkOut) {
       const existing = await getActiveStayBookings(data.room);
-      const hasOverlap = existing.some(
-        (b) => data.checkIn < b.checkOut && b.checkIn < data.checkOut
-      );
+      const hasOverlap = existing.some((b) => {
+        const bIn = normalizeDate(b.checkIn);
+        const bOut = normalizeDate(b.checkOut);
+        return data.checkIn < bOut && bIn < data.checkOut;
+      });
       if (hasOverlap) {
         console.log(`[BOOKING] 스테이 중복 거절 — ${data.room} / ${data.checkIn}~${data.checkOut}`);
         return NextResponse.json(

@@ -24,7 +24,7 @@ const rooms = [
     id: "oksun",
     name: "옥순방",
     en: "Oksun Room",
-    price: 120000,
+    price: 100000,
     capacity: "1~2인 / 1–2 guests",
     roomImg: "/images/stay/oksun-1.jpg",
     commonImg: "",

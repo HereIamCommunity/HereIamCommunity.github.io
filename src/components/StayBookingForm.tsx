@@ -16,7 +16,7 @@ function isOverlapping(checkIn: string, checkOut: string, ranges: DateRange[]): 
 
 const rooms = [
   { id: "nagnae", name: "나그네방", price: 60000, desc: "혼자 떠나온 여행자를 위한 아늑한 방", capacity: "1인", maxGuests: 1 },
-  { id: "oksun",  name: "옥순방",   price: 120000, desc: "둘이 함께 머물기 좋은 편안한 방",      capacity: "1~2인", maxGuests: 2 },
+  { id: "oksun",  name: "옥순방",   price: 100000, desc: "둘이 함께 머물기 좋은 편안한 방",      capacity: "1~2인", maxGuests: 2 },
   { id: "yeutae", name: "여태방",   price: 160000, desc: "넉넉한 공간에서 여유롭게 머무는 방",    capacity: "최대 4인", maxGuests: 4 },
 ];
 
