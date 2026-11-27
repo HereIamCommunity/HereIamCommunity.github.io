@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { sendCheckinReminderSMS } from "@/lib/notify";
+import { normalizeDate } from "@/lib/digest";
 
 // 내일 날짜를 KST 기준 YYYY-MM-DD 형식으로 반환
 function tomorrowKST(): string {
@@ -41,9 +42,7 @@ export async function GET(req: NextRequest) {
     const status = row[13] ?? "";
     if (status === "취소") continue;
 
-    const rawCheckIn = (row[8] ?? "").trim();
-    const m = rawCheckIn.match(/(\d{4})[.\-]?\s*(\d{1,2})[.\-]?\s*(\d{1,2})/);
-    const checkIn = m ? `${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}` : rawCheckIn;
+    const checkIn = normalizeDate((row[8] ?? "").trim());
     if (checkIn !== tomorrow) continue;
 
     const name = row[2] ?? "";

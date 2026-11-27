@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { sendCheckoutSMS } from "@/lib/notify";
+import { normalizeDate } from "@/lib/digest";
 
 // 오늘 날짜를 KST 기준 YYYY-MM-DD 형식으로 반환
 function todayKST(): string {
@@ -40,9 +41,7 @@ export async function GET(req: NextRequest) {
     const status = row[13] ?? "";
     if (status === "취소") continue;
 
-    const rawCheckOut = (row[9] ?? "").trim();
-    const m = rawCheckOut.match(/(\d{4})[.\-]?\s*(\d{1,2})[.\-]?\s*(\d{1,2})/);
-    const checkOut = m ? `${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}` : rawCheckOut;
+    const checkOut = normalizeDate((row[9] ?? "").trim());
     if (checkOut !== today) continue;
 
     const name = row[2] ?? "";

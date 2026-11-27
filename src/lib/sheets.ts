@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import { RETREAT_SESSIONS } from "@/lib/retreat-sessions";
 import { countKey } from "@/lib/programs";
+import { normalizeDate } from "@/lib/digest";
 import {
   attachRowMeta,
   mergeBookingRowsWithMeta,
@@ -88,8 +89,8 @@ export async function appendBooking(row: BookingRow) {
       row.date ?? "",
       row.room ?? "",
       row.nights ?? "",
-      row.checkIn ?? "",
-      row.checkOut ?? "",
+      normalizeDate(row.checkIn ?? ""),
+      normalizeDate(row.checkOut ?? ""),
       row.discount === "geot" ? "멤버십 곁 (-20%)" : row.discount === "nagnae" ? "나그네방 후원자 (-30%)" : "없음",
       row.totalAmount,
       row.memo ?? "",
@@ -780,8 +781,8 @@ export async function getActiveStayBookings(
       if (!row[0] || row[0] === "신청일시") continue;
       if ((row[13] ?? "") === "취소") continue;
       if ((row[6] ?? "") !== room) continue;
-      const checkIn = row[8] ?? "";
-      const checkOut = row[9] ?? "";
+      const checkIn = normalizeDate(row[8] ?? "");
+      const checkOut = normalizeDate(row[9] ?? "");
       if (checkIn && checkOut) result.push({ checkIn, checkOut });
     }
     return result;
