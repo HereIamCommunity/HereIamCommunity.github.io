@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllBookings } from "@/lib/sheets";
+import { normalizeDate } from "@/lib/digest";
 
 const ROOM_MAP: Record<string, string> = {
   nagnae: "나그네방",
@@ -34,8 +35,8 @@ export async function GET(
   const now = new Date().toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 
   const events = bookings.map((row, i) => {
-    const checkIn = row[8]?.replace(/-/g, "") ?? "";   // YYYYMMDD
-    const checkOut = row[9]?.replace(/-/g, "") ?? "";  // YYYYMMDD (exclusive in iCal)
+    const checkIn = normalizeDate(row[8] ?? "").replace(/-/g, "");   // YYYYMMDD
+    const checkOut = normalizeDate(row[9] ?? "").replace(/-/g, "");  // YYYYMMDD (exclusive in iCal)
     const uid = `koinonia-${roomId}-${i}-${checkIn}@koinonia-web.vercel.app`;
 
     if (!checkIn || !checkOut) return "";

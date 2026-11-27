@@ -578,8 +578,8 @@ export default function SalonBookingForm({
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
-        {/* 카드결제 버튼: 토스페이먼츠 키가 설정된 경우에만 노출 */}
-        {activeFinalAmount > 0 && !!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY && (
+        {/* 카드결제 버튼: 토스페이먼츠 키가 설정된 경우에만 노출 (임시 비활성화) */}
+        {false && activeFinalAmount > 0 && !!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY && (
           <button
             type="button"
             onClick={handleCardPay}
@@ -594,13 +594,9 @@ export default function SalonBookingForm({
         <button
           type="submit"
           disabled={loading}
-          className={`w-full font-semibold py-4 rounded-xl transition-colors disabled:opacity-60 ${
-            activeFinalAmount > 0 && !!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY
-              ? "bg-white text-[#372a14] border-2 border-[#372a14] hover:bg-[#372a14] hover:text-white"
-              : "bg-[#ff6b35] text-white hover:bg-[#e55a25]"
-          }`}
+          className="w-full font-semibold py-4 rounded-xl transition-colors disabled:opacity-60 bg-[#ff6b35] text-white hover:bg-[#e55a25]"
         >
-          {loading ? "처리 중..." : activeFinalAmount > 0 && !!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY ? "계좌이체로 신청하기" : "신청 완료 → 계좌 정보 확인"}
+          {loading ? "처리 중..." : "신청 완료 → 계좌 정보 확인"}
         </button>
         <p className="text-xs text-gray-400 text-center mt-3">
           {activeFinalAmount > 0

@@ -8,33 +8,33 @@ export default function Home() {
       <PotluckPopup />
 
 
-      {/* ── 0-1. 종가음식 포틀럭 배너 ── */}
+      {/* ── 0-1. 뮤직나잇 배너 ── */}
       <Link
         href="/salon"
-        className="group flex flex-col sm:flex-row items-stretch bg-[#2f1d3a] border-b border-white/5 hover:bg-[#3a2448] transition-colors duration-300 overflow-hidden"
+        className="group flex flex-col sm:flex-row items-stretch bg-[#7a1515] border-b border-white/5 hover:bg-[#8c1a1a] transition-colors duration-300 overflow-hidden"
       >
-        <div className="relative w-full sm:w-48 md:w-64 h-52 sm:h-auto shrink-0 overflow-hidden">
+        <div className="relative w-full sm:w-44 md:w-56 h-44 sm:h-auto shrink-0 overflow-hidden">
           <Image
-            src="/images/potluck/card-main.png"
-            alt="접빈객 : 환대의 식탁 — 종가음식 포틀럭"
-            width={1080}
-            height={1080}
-            className="w-full h-full object-cover object-top"
+            src="/images/salon/music-night-nov27.webp"
+            alt="HOMEMAGE 3 — 뮤직나잇 11월 27일"
+            width={960}
+            height={960}
+            className="w-full h-full object-cover object-center"
           />
         </div>
         <div className="flex flex-col justify-center px-7 md:px-12 py-7 md:py-10 gap-2">
-          <p className="text-[#f5a623] text-[10px] tracking-[0.35em] uppercase font-semibold">
-            November – December 2026 · 종가음식 포틀럭
+          <p className="text-[#f5c6a0] text-[10px] tracking-[0.35em] uppercase font-semibold">
+            November 27 · Music Night
           </p>
           <h2 className="text-xl md:text-2xl font-light text-white leading-snug">
-            접빈객 : 환대의 식탁<br />
-            <span className="text-[#a3c96e] font-medium">우리 같이 종가음식 먹어요.</span>
+            HOMEMAGE 3<br />
+            <span className="text-[#f5c6a0] font-medium">우리 같이 뮤직나잇 즐겨요.</span>
           </h2>
-          <p className="text-white/40 text-xs leading-relaxed">
-            11.18 – 12.16 · 매주 수요일 19:00–21:00 · 무료 · 저녁 식사 포함
+          <p className="text-white/50 text-xs leading-relaxed">
+            11월 27일 (금) 오후 8시 · Guest: CO_OS × PIDA · koinonia
           </p>
-          <span className="mt-2 self-start inline-flex items-center gap-2 bg-[#f5a623] text-[#2f1d3a] text-xs font-semibold px-5 py-2.5 rounded-full group-hover:bg-[#a3c96e] transition-colors duration-300">
-            포틀럭 신청하러 가기
+          <span className="mt-2 self-start inline-flex items-center gap-2 bg-white/15 text-white text-xs font-semibold px-5 py-2.5 rounded-full group-hover:bg-white/25 transition-colors duration-300">
+            자세히 보기
             <span className="group-hover:translate-x-1 transition-transform duration-300">→</span>
           </span>
         </div>
